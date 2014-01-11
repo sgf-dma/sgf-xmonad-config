@@ -1,0 +1,5 @@
+-- This does not run due to syntax errors, but it seems correct for me..
+Config { commands = [ Run Date "%a %H:%M:%S" "viennaTime" 10
+                    ]
+       , template = "%viennaTime%"
+       }
