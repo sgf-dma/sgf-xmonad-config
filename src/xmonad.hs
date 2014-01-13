@@ -2,8 +2,8 @@
 import XMonad
 import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.ManageDocks
+import XMonad.Layout.NoBorders
 import XMonad.Util.Run (spawnPipe)
---import XMonad.Layout.NoBorders
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
@@ -23,7 +23,7 @@ main                = do
       . alterKeys myKeys
       $ defaultConfig
           { manageHook = manageDocks <+> manageHook defaultConfig
-          , layoutHook = avoidStruts  $  layoutHook defaultConfig
+          , layoutHook = smartBorders . avoidStruts  $  layoutHook defaultConfig
           , logHook    = dynamicLogWithPP xmobarPP
                            { ppOutput = hPutStrLn xmPipe
                            , ppTitle  = xmobarColor "green" ""
