@@ -4,6 +4,7 @@ import XMonad.Hooks.DynamicLog
 import XMonad.Hooks.ManageDocks
 import XMonad.Layout.NoBorders
 import XMonad.Util.Run (spawnPipe)
+import qualified XMonad.StackSet as W
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
@@ -29,6 +30,9 @@ main                = do
                            , ppTitle  = xmobarColor "green" ""
                                           . shorten 50
                            }
+          -- Workspace "lock" is for xtrlock only and it is inaccessible for
+          -- workspace switch keys.
+          , workspaces = map show [1..9] ++ ["lock"]
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
@@ -76,13 +80,41 @@ alterKeys :: (XConfig Layout -> M.Map (ButtonMask, KeySym) (X ()))
              -> XConfig l -> XConfig l
 alterKeys myKs cf@(XConfig {keys = ks}) = cf {keys = M.union <$> myKs <*> ks}
 
+-- FIXME: When i wait for xtrlock process to terminate, i always come back to
+-- old workpace, where i was before pressing lock keys (regardless of
+-- workpspace switching code) and all windows are closed on it. Why? But it
+-- does not close windows, if i comment out code, obtaining current
+-- workspace..
+
+-- Get current workspace tag, then switch to workspace "lock" (dedicated for
+-- "xtrlock" and inaccessible for workspace switch keys) and lock. After
+-- unlocking return back to workspace, where i was before.
+lock :: X ()
+lock                = do
+                        --wi <- gets curWsId
+                        windows (W.greedyView "lock")
+                        spawn "xtrlock"
+                        --p <- liftIO xtrlock
+                        --liftIO (waitForProcess p)
+                        --windows (W.greedyView wi)
+                        return ()
+  where
+    -- Get current workspace tag.
+    curWsId :: XState -> WorkspaceId
+    curWsId         = W.tag . W.workspace . W.current . windowset
+    xtrlock :: IO ProcessHandle
+    xtrlock         = do
+                        (_, _, _, p) <-
+                            createProcess (proc "/usr/bin/xtrlock" [])
+                        return p
+
 -- My key bindings. They are intended for use with alterKeys only.
 myKeys :: XConfig l -> M.Map (ButtonMask, KeySym) (X ())
 myKeys (XConfig {modMask = m}) =
     M.fromList
       [ 
       --((m .|. shiftMask, xK_p), spawn "exec gmrun")
-        ((m .|. shiftMask, xK_z), spawn "xscreensaver-command -lock")
+        ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
 
