@@ -17,8 +17,6 @@ import System.Process
 main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
-    runFehBg
-    _ <- runTrayer
     xmPipe <- spawnPipe ("xmobar ~/.xmobarrc")
     xmonad
       . alterKeys myKeys
@@ -51,27 +49,6 @@ layout = tiled ||| Mirror tiled ||| noBorders Full
     -- Percent of screen to increment by when resizing panes
     delta   = 3/100
 
-
--- Run trayer.
-runTrayer :: IO ProcessHandle
-runTrayer           = do
-    let tray = proc "trayer"
-                 [ "--edge", "top", "--align", "right"
-                 , "--SetDockType", "true", "--SetPartialStrut", "true"
-                 , "--expand", "true", "--width", "10"
-                 , "--transparent", "true" , "--tint", "0x191970"
-                 , "--height", "12"
-                 ]
-    (_, _, _, p) <- createProcess tray
-    return p
-
--- Set up background image using feh.
-runFehBg :: IO ProcessHandle
-runFehBg           = do
-    home <- getHomeDirectory
-    fehBg <- readFile (home </> ".fehbg")
-    (_, _, _, p) <- createProcess (shell fehBg)
-    return p
 
 -- Union my keys config with current one in ((->) XConfig Layout) applicative
 -- functor. Union prefers left argument, when duplicate keys are found, thus
