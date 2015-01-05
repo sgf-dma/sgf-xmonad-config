@@ -1,14 +1,19 @@
-Config { font = "-*-Fixed-Bold-R-Normal-*-13-*-*-*-*-*-*-*"
+Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
        , bgColor = "grey"
        , fgColor = "black"
        , position = TopW L 90
-       , commands = [ Run Cpu ["-L","3","-H","50","--normal","green","--high","red"] 10
-                    , Run Memory ["-t","Mem: <usedratio>%"] 10
-                    , Run Swap [] 10
-                    , Run Date "%a %b %_d %_H:%M" "date" 10
+       , commands = [ Run MultiCpu ["-t", "<total0>%/<total1>%", "-L","10","-H","70","-n","green","-h","red"] 10
+		    , Run CoreTemp ["-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "green", "-h", "red"] 10
+		    , Run Com "cut" ["-d' '", "-f1,2", "/proc/loadavg"] "loadavg" 10
+                    , Run Memory ["-t","<usedratio>%", "-L", "30", "-n", "green", "-H", "70", "-h", "red"] 10
+                    , Run Swap ["-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
+                    , Run Com "date" ["+'%a%_d%b %_H:%M'"] "extdate" 10
                     , Run StdinReader
+		    , Run Kbd [("us", "US"), ("ru", "RU")]
+		    , Run Wireless "wlan0" ["-t", "<essid> <quality>"] 10
+		    , Run Network "wlan0" ["-t", "<rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
        , alignSep = "}{"
-       , template = "%StdinReader% }{ %cpu% | %memory% * %swap%    %date%"
+       , template = "%StdinReader% } %extdate% * %kbd% { Cpu: %multicpu% %coretemp% Load: %loadavg% Mem: %memory%/%swap% * wlan0: %wlan0wi%, %wlan0% "
        }
