@@ -14,15 +14,17 @@ import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 import System.Process
 
+import Sgf.XMonad
+
 main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
     xmPipe <- spawnPipe ("xmobar ~/.xmobarrc")
     xmonad
+      . handleDocks
       . alterKeys myKeys
       $ defaultConfig
-          { manageHook = manageDocks <+> manageHook defaultConfig
-          , layoutHook = avoidStruts $ layout
+          { layoutHook = layout
           , logHook    = dynamicLogWithPP xmobarPP
                            { ppOutput = hPutStrLn xmPipe
                            , ppTitle  = xmobarColor "green" ""
