@@ -14,7 +14,7 @@ import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 import System.Process
 
-import Sgf.XMonad
+import Sgf.XMonad.Docks
 
 main :: IO ()
 main                = do
