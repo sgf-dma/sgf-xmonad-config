@@ -6,6 +6,7 @@ import XMonad.Layout.NoBorders
 import XMonad.Util.Run (spawnPipe)
 import qualified XMonad.StackSet as W
 
+import Data.Monoid (First (..))
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
@@ -19,17 +20,11 @@ import Sgf.XMonad.Docks
 main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
-    xmPipe <- spawnPipe ("xmobar ~/.xmobarrc")
     xmonad
-      . handleDocks
+      . handleDocks xmobarTop
       . alterKeys myKeys
       $ defaultConfig
           { layoutHook = layout
-          , logHook    = dynamicLogWithPP xmobarPP
-                           { ppOutput = hPutStrLn xmPipe
-                           , ppTitle  = xmobarColor "green" ""
-                                          . shorten 50
-                           }
           -- Workspace "lock" is for xtrlock only and it is inaccessible for
           -- workspace switch keys.
           , workspaces = map show [1..9] ++ ["lock"]
@@ -38,6 +33,14 @@ main                = do
           , terminal = "xterm -fg black -bg white"
           --, layoutHook = smartBorders $ layoutHook xfceConfig
           }
+
+
+xmobarTop :: XmobarPID
+xmobarTop     = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
+                  , xmobarPipe = (True, Nothing)
+                  }
 
 -- Layouts definition from defaultConfig with Full layout without borders.
 layout = tiled ||| Mirror tiled ||| noBorders Full
