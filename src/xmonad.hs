@@ -5,6 +5,7 @@ import XMonad.Hooks.ManageDocks
 import XMonad.Layout.NoBorders
 import XMonad.Util.Run (spawnPipe)
 import qualified XMonad.StackSet as W
+import qualified XMonad.Util.ExtensibleState as XS
 
 import Data.Monoid (First (..))
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
@@ -21,7 +22,7 @@ main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
     xmonad
-      . handleDocks xmobarTop
+      . handleDocks [(0, xK_b)] [xmobarTop, xmobarBot]
       . alterKeys myKeys
       $ defaultConfig
           { layoutHook = layout
@@ -31,15 +32,43 @@ main                = do
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
+	  , logHook = traceXS "Huh"
           --, layoutHook = smartBorders $ layoutHook xfceConfig
           }
 
+
+traceXS :: String -> X ()
+traceXS l = do
+    trace l
+    xs <- XS.get
+    mapM_ (trace . show) (xs :: [XmobarPID])
+    ts <- XS.get
+    mapM_ (trace . show) (ts :: [TrayerPID])
+    --fs <- XS.get
+    --mapM_ (trace . show) (fs :: [FehPID])
+    {-
+    trace "For trayer:"
+    forM_ ts $ \x -> whenJust (getPidP x) pidStatus
+    trace "For feh:"
+    forM_ fs $ \x -> whenJust (getPidP x) pidStatus-}
+  --where
+  --  pidStatus :: ProcessID -> X ()
+  --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
 
 xmobarTop :: XmobarPID
 xmobarTop     = XmobarPID
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
                   , xmobarPipe = (True, Nothing)
+                  , xmobarToggle = Just (shiftMask, xK_v)
+                  }
+
+xmobarBot :: XmobarPID
+xmobarBot     = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc2"
+                  , xmobarPipe = (True, Nothing)
+                  , xmobarToggle = Just (shiftMask, xK_b)
                   }
 
 -- Layouts definition from defaultConfig with Full layout without borders.
