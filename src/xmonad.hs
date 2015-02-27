@@ -1,22 +1,21 @@
 
 import XMonad
-import XMonad.Hooks.DynamicLog
-import XMonad.Hooks.ManageDocks
 import XMonad.Layout.NoBorders
-import XMonad.Util.Run (spawnPipe)
 import qualified XMonad.StackSet as W
 import qualified XMonad.Util.ExtensibleState as XS
 
-import Data.Monoid (First (..))
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
-import System.IO (hPutStrLn)
-import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 import System.Process
 
+import Data.Monoid
+import XMonad.Layout.LayoutScreens
+
 import Sgf.XMonad.Docks
+import Sgf.Control.Lens
+import Sgf.XMonad.Restartable
 
 main :: IO ()
 main                = do
@@ -41,9 +40,9 @@ traceXS :: String -> X ()
 traceXS l = do
     trace l
     xs <- XS.get
-    mapM_ (trace . show) (xs :: [XmobarPID])
+    mapM_ (trace . show) (view processList xs :: [XmobarPID])
     ts <- XS.get
-    mapM_ (trace . show) (ts :: [TrayerPID])
+    mapM_ (trace . show) (view processList ts :: [TrayerPID])
     --fs <- XS.get
     --mapM_ (trace . show) (fs :: [FehPID])
     {-
@@ -61,6 +60,14 @@ xmobarTop     = XmobarPID
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
                   , xmobarPipe = (True, Nothing)
                   , xmobarToggle = Just (shiftMask, xK_v)
+                  }
+
+xmobarTop2 :: XmobarPID
+xmobarTop2    = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
+                  , xmobarPipe = (False, Nothing)
+                  , xmobarToggle = Nothing
                   }
 
 xmobarBot :: XmobarPID

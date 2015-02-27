@@ -1,7 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Sgf.XMonad.Restartable
-    ( RestartClass (..)
+    ( ProcessClass (..)
+    , withProcess
+    , ListP
+    , emptyListP
+    , processList
+    , RestartClass (..)
     , defaultRunP
     , startP
     , startP'
@@ -12,7 +18,6 @@ module Sgf.XMonad.Restartable
     )
   where
 
-import Data.Monoid
 import Control.Monad
 import Control.Monad.Trans
 import Control.Exception (try, IOException)
@@ -24,11 +29,38 @@ import XMonad.Core
 import qualified XMonad.Util.ExtensibleState as XS
 
 import Sgf.Data.List
+import Sgf.Control.Lens
 import Sgf.XMonad.Util.Run
 
-class (Eq a, Monoid a) => RestartClass a where
+
+-- To avoid orphan (ExtensionClass [a]) instance, i need newtype.
+newtype ListP a     = ListP {_processList :: [a]}
+  deriving (Show, Read, Typeable)
+emptyListP :: ListP a
+emptyListP          = ListP []
+processList :: Lens (ListP a) [a]
+processList f (ListP xs)    = fmap ListP (f xs)
+
+instance (Show a, Read a, Typeable a) => ExtensionClass (ListP a) where
+    initialValue    = emptyListP
+    extensionType   = PersistentExtension
+
+-- Strictly, all ProcessClass requirments are not required to define its
+-- instance. But ProcessClass has these requirments, because i need
+-- withProcess to work on its instances.
+class (Eq a, Show a, Read a, Typeable a) => ProcessClass a where
     getPidP           :: a -> Maybe ProcessID
     setPidP           :: Maybe ProcessID -> a -> a
+
+-- Run function on processes equal to given one. If there is no such processes
+-- in extensible state, add given process there and run function on it.
+withProcess :: ProcessClass a => (a -> X a) -> a -> X ()
+withProcess f y     = do
+    x  <- XS.get
+    ps <- mapWhenM (== y) f (insertUniq y (view processList x))
+    XS.put (set processList ps x)
+
+class ProcessClass a => RestartClass a where
     runP              :: a -> X a
     -- restartP3' relies on PID 'Nothing' after killP, because it then calls
     -- startP3' and it won't do anything, if PID will still exist. So, here i
@@ -38,27 +70,13 @@ class (Eq a, Monoid a) => RestartClass a where
                         whenJust (getPidP x) $ signalProcess sigTERM
                         return (setPidP Nothing x)
 
-defaultRunP :: RestartClass a => FilePath -> [String] -> a -> X a
+defaultRunP :: ProcessClass a => FilePath -> [String] -> a -> X a
 defaultRunP x xs z  = do
                         p <- spawnPID' x xs
                         return (setPidP (Just p) z)
 
-instance (Show a, Read a, Typeable a) => ExtensionClass [a] where
-    initialValue    = []
-    extensionType   = PersistentExtension
-
--- Run function on matched PIDs with specific type.  Argument's Eq instance is
--- used to find value in extensible state to act upon. Also, argument is
--- `mappend`-ed to found value, so i should pass mempty, if i want to just
--- "match", and something different, if i want to "match and replace".
-runWithP :: (Eq a, Monoid a, ExtensionClass [a]) => (a -> X a) -> a -> X ()
-runWithP f y        = do
-    xs  <- XS.gets (insertWith mappend y)
-    xs' <- mapM (\x -> if y == x then f x else return x) xs
-    XS.put xs'
-
 -- Based on doesPidProgRun .
-refreshPid :: (MonadIO m, RestartClass a) => a -> m a
+refreshPid :: (MonadIO m, ProcessClass a) => a -> m a
 refreshPid x        = case (getPidP x) of
     Nothing -> return x
     Just p  -> liftIO $ do
@@ -86,12 +104,12 @@ restartP'           = startP' <=< stopP'
 
 -- Here are versions of start/restart working on extensible state.
 -- Usually, these should be used.
-stopP :: (ExtensionClass [a], RestartClass a) => a -> X ()
-stopP               = runWithP stopP'
+stopP :: RestartClass a => a -> X ()
+stopP               = withProcess stopP'
 
-startP :: (ExtensionClass [a], RestartClass a) => a -> X ()
-startP              = runWithP startP'
+startP :: RestartClass a => a -> X ()
+startP              = withProcess startP'
 
-restartP :: (ExtensionClass [a], RestartClass a) => a -> X ()
-restartP            = runWithP restartP'
+restartP :: RestartClass a => a -> X ()
+restartP            = withProcess restartP'
 

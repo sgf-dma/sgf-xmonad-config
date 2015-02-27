@@ -1,6 +1,8 @@
 
 module Sgf.Data.List
-    ( insertWith
+    ( insertUniq
+    , mapWhen
+    , mapWhenM
     , ReadM
     , liftRead
     , readsPrecM
@@ -12,12 +14,17 @@ module Sgf.Data.List
 
 import Control.Monad.State
 
--- Similar to insertWith from Data.Map, but for lists.
-insertWith :: Eq a => (a -> a -> a) -> a -> [a] -> [a]
-insertWith f y []   = [y]
-insertWith f y (x : xs)
-  | y == x          = f y x : xs
-  | otherwise       = x : insertWith f y xs
+insertUniq :: Eq a => a -> [a] -> [a]
+insertUniq y xs
+  | y `elem` xs     = xs
+  | otherwise       = y : xs
+
+mapWhen :: Eq a => (a -> Bool) -> (a -> a) -> [a] -> [a]
+mapWhen p f         = map (\x -> if p x then f x else x)
+
+mapWhenM :: Eq a => Monad m => (a -> Bool) -> (a -> m a) -> [a] -> m [a]
+mapWhenM p f        = mapM (\x -> if p x then f x else return x)
+
 
 -- Store remaining string in State monad.
 type ReadM a        = StateT String [] a

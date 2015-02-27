@@ -12,7 +12,6 @@ module Sgf.XMonad.Docks
 import Data.Maybe
 import Data.List
 import Data.Monoid
-import qualified Data.Map as M
 import Control.Monad.State
 import Control.Applicative
 import System.IO
@@ -28,36 +27,39 @@ import XMonad.Util.WindowProperties (getProp32s)
 import XMonad.Util.XUtils (fi)
 import Foreign.C.Types (CLong)
 
-import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.Data.List
+import Sgf.Control.Lens
+import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.XMonad.Restartable
 
 -- Take list of keys for toggling all docks and list of xmobar instances,
 -- each may have each own toggle.
-handleDocks :: LayoutClass l Window =>
-               [(ButtonMask, KeySym)] -> [XmobarPID] -> XConfig l
+handleDocks :: (RestartClass a, DockClass a, LayoutClass l Window) =>
+               [(ButtonMask, KeySym)]   -- Toggle docks key(s).
+               -> [a]                   -- Docks to start.
+               -> XConfig l
                -> XConfig (ModifiedLayout AvoidStruts l)
-handleDocks ts xms x = 
-    additionalKeys <*> dockKeys $ x
-      -- First, demanage dock applications.
-      { manageHook = manageDocks <+> manageHook x
+handleDocks ts ds cf = 
+    additionalKeys <*> dockKeys $ cf
+      -- First, de-manage dock applications.
+      { manageHook = manageDocks <+> manageHook cf
       -- Then refresh screens after new dock appears.
-      , handleEventHook = docksEventHook <+> handleEventHook x
+      , handleEventHook = docksEventHook <+> handleEventHook cf
       -- Reduce Rectangle available for other windows.
-      , layoutHook = avoidStruts (layoutHook x)
+      , layoutHook = avoidStruts (layoutHook cf)
       -- I can union keys explicitly
       --, keys = sequence [toggleBotDock, toggleDocks, keys x] >>=
       --    return . foldr M.union M.empty
       -- or use additionalKeys above.
 
       -- Log to all open xmobar pipes.
-      , logHook = xmobarLog >> logHook x
-      , startupHook = mapM_ restartP xms >> startupHook x
+      , logHook = xmobarLog >> logHook cf
+      , startupHook = mapM_ restartP ds >> startupHook cf
       }
   where
     dockKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
     dockKeys        = fmap concat . sequence $
-                        map toggleDocks ts ++ map toggleXmobar xms
+                        map toggleAllDocks ts ++ map toggleDock ds
 
 -- docksEventHook version from xmobar tutorial (5.3.1 "Example for using the
 -- DBus IPC interface with XMonad"), which refreshes screen on unmap events as
@@ -70,28 +72,30 @@ docksEventHook e = do
     where w  = ev_window e
           et = ev_event_type e
 
-toggleDocks :: (ButtonMask, KeySym) -> XConfig l
+toggleAllDocks :: (ButtonMask, KeySym) -> XConfig l
                -> [((ButtonMask, KeySym), X ())]
-toggleDocks (mk, k) XConfig {modMask = m} =
+toggleAllDocks (mk, k) XConfig {modMask = m} =
                         [((m .|. mk, k), sendMessage ToggleStruts)]
 
-toggleXmobar :: XmobarPID -> XConfig l -> [((ButtonMask, KeySym), X ())]
-toggleXmobar x (XConfig {modMask = m}) = maybeToList $ do
-    (mk, k) <- xmobarToggle x
-    return ((m .|. mk, k), toggleRestartable x)
+class ProcessClass a => DockClass a where
+    dockToggleKey   :: a -> Maybe (ButtonMask, KeySym)
+
+toggleDock :: DockClass a => a -> XConfig l -> [((ButtonMask, KeySym), X ())]
+toggleDock x (XConfig {modMask = m}) = maybeToList $ do
+    (mk, k) <- dockToggleKey x
+    return ((m .|. mk, k), toggleProcessStruts x)
 
 
-
--- Toggle struts for any restartable type (in fact, i just need (Eq a) and
+-- Toggle struts for any ProcessClass type (in fact, i just need (Eq a) and
 -- getPidP).
-toggleRestartable :: (ExtensionClass [a], RestartClass a) => a -> X ()
-toggleRestartable x = do
-    xs <- XS.get
-    mapM_ (maybe (return ()) togglePid . getPidP) . filter (x ==) $ xs
+toggleProcessStruts :: ProcessClass a => a -> X ()
+toggleProcessStruts = withProcess $ \x -> do
+    maybe (return ()) togglePidStruts (getPidP x)
+    return x
 
 -- Toggle all struts, which specified PID have.
-togglePid :: ProcessID -> X ()
-togglePid pid = withDisplay $ \dpy -> do
+togglePidStruts :: ProcessID -> X ()
+togglePidStruts pid = withDisplay $ \dpy -> do
     rootw <- asks theRoot
     (_, _, wins) <- io $ queryTree dpy rootw
     ws <- filterM winPid wins
@@ -126,10 +130,10 @@ getStrut w = do
     parseStrutPartial _ = []
 -- End copy from XMonad.Hooks.ManageDocks .
 
-xmobarLog :: X()
+xmobarLog :: X ()
 xmobarLog           = do
     xs <- XS.get
-    forM_ xs $ \XmobarPID {xmobarPipe = (_, mp)} ->
+    forM_ (view processList xs) $ \XmobarPID {xmobarPipe = (_, mp)} ->
       whenJust mp $ \xmPipe ->
         dynamicLogWithPP xmobarPP
           { ppOutput = hPutStrLn xmPipe
@@ -186,14 +190,17 @@ instance Monoid XmobarPID where
                         , xmobarToggle = Nothing
                         }
     x `mappend` y   = x{xmobarPID = xmobarPID x `mappend` xmobarPID y}
-instance RestartClass XmobarPID where
+instance ProcessClass XmobarPID where
     getPidP         = getFirst . xmobarPID
     setPidP mp' x   = x{xmobarPID = First mp'}
+instance RestartClass XmobarPID where
     runP x@(XmobarPID{xmobarConf = xcf, xmobarPipe = (xb, _)})
       | xb          = do
         (h, p) <- spawnPipe' "xmobar" [xcf]
         return (x{xmobarPID = First (Just p), xmobarPipe = (True, Just h)})
       | otherwise   = defaultRunP "xmobar" [xcf] x
+instance DockClass XmobarPID where
+    dockToggleKey   = xmobarToggle
 
 -- Copy from xmobar/src/Config.hs . I need to read xmobar config for
 -- determining its position.
@@ -207,9 +214,10 @@ newtype TrayerPID    = TrayerPID {trayerPID  :: First ProcessID}
   deriving (Show, Read, Typeable, Monoid)
 instance Eq TrayerPID where
   _ == _    = True
-instance RestartClass TrayerPID where
+instance ProcessClass TrayerPID where
   getPidP        = getFirst . trayerPID
   setPidP mp' x  = x{trayerPID = First mp'}
+instance RestartClass TrayerPID where
   runP           = defaultRunP "trayer"
       [ "--edge", "top", "--align", "right"
       , "--SetDockType", "true", "--SetPartialStrut", "true"
