@@ -6,6 +6,7 @@ module Sgf.XMonad.Docks
     ( handleDocks
     , XmobarPID (..)
     , TrayerPID (..)
+    , xmobarPP'
     )
   where
 
@@ -22,13 +23,11 @@ import XMonad.Hooks.ManageDocks hiding (docksEventHook)
 import XMonad.Hooks.DynamicLog
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Util.EZConfig (additionalKeys)
-import qualified XMonad.Util.ExtensibleState as XS
 import XMonad.Util.WindowProperties (getProp32s)
 import XMonad.Util.XUtils (fi)
 import Foreign.C.Types (CLong)
 
 import Sgf.Data.List
-import Sgf.Control.Lens
 import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.XMonad.Restartable
 
@@ -52,14 +51,21 @@ handleDocks ts ds cf =
       --    return . foldr M.union M.empty
       -- or use additionalKeys above.
 
-      -- Log to all open xmobar pipes.
-      , logHook = xmobarLog >> logHook cf
-      , startupHook = mapM_ restartP ds >> startupHook cf
+      -- Log to all docks according to their PP .
+      , logHook = mapM_ dockLog ds >> logHook cf
+      --, startupHook = mapM_ restartP ds >> mapM_ reinitPP ds >> startupHook cf
+      --, startupHook = mapM_ (restartP <* reinitPP)  ds >> startupHook cf
+      -- reinitPP should be done before restart, because i may check or fill
+      -- some PP values in startP.
+      , startupHook = mapM_ (liftA2 (<*) reinitPP restartP) ds >> startupHook cf
       }
   where
     dockKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
     dockKeys        = fmap concat . sequence $
                         map toggleAllDocks ts ++ map toggleDock ds
+
+reinitPP :: DockClass a => a -> X ()
+reinitPP y          = withProcess (\x -> return (setDockPP (getDockPP y) x)) y
 
 -- docksEventHook version from xmobar tutorial (5.3.1 "Example for using the
 -- DBus IPC interface with XMonad"), which refreshes screen on unmap events as
@@ -79,6 +85,8 @@ toggleAllDocks (mk, k) XConfig {modMask = m} =
 
 class ProcessClass a => DockClass a where
     dockToggleKey   :: a -> Maybe (ButtonMask, KeySym)
+    getDockPP       :: a -> Maybe PP
+    setDockPP       :: Maybe PP -> a -> a
 
 toggleDock :: DockClass a => a -> XConfig l -> [((ButtonMask, KeySym), X ())]
 toggleDock x (XConfig {modMask = m}) = maybeToList $ do
@@ -130,15 +138,10 @@ getStrut w = do
     parseStrutPartial _ = []
 -- End copy from XMonad.Hooks.ManageDocks .
 
-xmobarLog :: X ()
-xmobarLog           = do
-    xs <- XS.get
-    forM_ (view processList xs) $ \XmobarPID {xmobarPipe = (_, mp)} ->
-      whenJust mp $ \xmPipe ->
-        dynamicLogWithPP xmobarPP
-          { ppOutput = hPutStrLn xmPipe
-          , ppTitle  = xmobarColor "green" "" . shorten 50
-          }
+dockLog :: DockClass a => a ->  X ()
+dockLog             = withProcess $ \x -> do
+    maybe (return ()) dynamicLogWithPP (getDockPP x)
+    return x
 
 
 -- This XmobarPID definition suitable for launching several xmobars. They will
@@ -146,7 +149,7 @@ xmobarLog           = do
 data XmobarPID      = XmobarPID
                         { xmobarPID     :: First ProcessID
                         , xmobarConf    :: FilePath
-                        , xmobarPipe    :: (Bool, Maybe Handle)
+                        , xmobarPP2     :: Maybe PP
                         , xmobarToggle  :: Maybe (ButtonMask, KeySym)
                         }
   deriving (Typeable)
@@ -155,7 +158,6 @@ instance Show XmobarPID where
     showsPrec d x   = showParen (d > app_prec) $
         showString "XmobarPID {xmobarPID = " . showsPrec d (xmobarPID x)
         . showString ", xmobarConf = " . showsPrec d (xmobarConf x)
-        . showString ", xmobarPipe = " . showsPrec d (fst $ xmobarPipe x)
         . showString ", xmobarToggle = " . showsPrec d (xmobarToggle x)
         . showString "}"
       where
@@ -165,13 +167,12 @@ instance Read XmobarPID where
         readLexsM ["XmobarPID"]
         xp <- readLexsM ["{", "xmobarPID", "="] >> readsPrecM d
         xc <- readLexsM [",", "xmobarConf", "="] >> readsPrecM d
-        xb <- readLexsM [",", "xmobarPipe", "="] >> readsPrecM d
         xt <- readLexsM [",", "xmobarToggle", "="] >> readsPrecM d
         readLexsM ["}"]
         let x = XmobarPID
                   { xmobarPID       = xp
                   , xmobarConf      = xc
-                  , xmobarPipe      = (xb, Nothing)
+                  , xmobarPP2       = Nothing
                   , xmobarToggle    = xt
                   }
         return x
@@ -186,7 +187,7 @@ instance Monoid XmobarPID where
     mempty          = XmobarPID
                         { xmobarPID = First Nothing
                         , xmobarConf = ""
-                        , xmobarPipe = (False, Nothing)
+                        , xmobarPP2  = Nothing
                         , xmobarToggle = Nothing
                         }
     x `mappend` y   = x{xmobarPID = xmobarPID x `mappend` xmobarPID y}
@@ -194,13 +195,26 @@ instance ProcessClass XmobarPID where
     getPidP         = getFirst . xmobarPID
     setPidP mp' x   = x{xmobarPID = First mp'}
 instance RestartClass XmobarPID where
-    runP x@(XmobarPID{xmobarConf = xcf, xmobarPipe = (xb, _)})
-      | xb          = do
+    runP x@(XmobarPID{xmobarConf = xcf, xmobarPP2 = Just xpp}) = do
         (h, p) <- spawnPipe' "xmobar" [xcf]
-        return (x{xmobarPID = First (Just p), xmobarPipe = (True, Just h)})
+        return (x{ xmobarPID = First (Just p)
+                 , xmobarPP2 = Just (xpp{ppOutput = hPutStrLn h})
+                 })
+    runP x@(XmobarPID{xmobarConf = xcf})
       | otherwise   = defaultRunP "xmobar" [xcf] x
+    killP           = return . resetPipe <=< defaultKillP
+      where
+        resetPipe :: XmobarPID -> XmobarPID
+        resetPipe x@(XmobarPID{xmobarPP2 = Just xpp}) =
+            x{xmobarPP2 = Just (xpp{ppOutput = const (return ())})}
+        resetPipe x = x
+xmobarPP' :: PP
+xmobarPP' = xmobarPP {ppOutput = const (return ())}
 instance DockClass XmobarPID where
     dockToggleKey   = xmobarToggle
+    getDockPP       = xmobarPP2
+    setDockPP pp x  = maybe x (\t -> x{xmobarPP2 = Just t}) pp
+
 
 -- Copy from xmobar/src/Config.hs . I need to read xmobar config for
 -- determining its position.
