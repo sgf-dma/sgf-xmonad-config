@@ -42,9 +42,9 @@ traceXS :: String -> X ()
 traceXS l = do
     trace l
     xs <- XS.get
-    mapM_ (trace . show) (view processList xs :: [XmobarPID])
+    mapM_ (trace . show) (view processList xs :: [Xmobar])
     ts <- XS.get
-    mapM_ (trace . show) (view processList ts :: [TrayerPID])
+    mapM_ (trace . show) (view processList ts :: [Trayer])
     --fs <- XS.get
     --mapM_ (trace . show) (fs :: [FehPID])
     {-
@@ -56,8 +56,8 @@ traceXS l = do
   --  pidStatus :: ProcessID -> X ()
   --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
 
-xmobarTop :: XmobarPID
-xmobarTop     = XmobarPID
+xmobarTop :: Xmobar
+xmobarTop     = Xmobar
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
                   , xmobarPP2 = Just xmobarPP'
@@ -66,16 +66,16 @@ xmobarTop     = XmobarPID
                   , xmobarToggle = Just (shiftMask, xK_v)
                   }
 
-xmobarTop2 :: XmobarPID
-xmobarTop2    = XmobarPID
+xmobarTop2 :: Xmobar
+xmobarTop2    = Xmobar
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
                   , xmobarPP2 = Nothing
                   , xmobarToggle = Nothing
                   }
 
-xmobarBot :: XmobarPID
-xmobarBot     = XmobarPID
+xmobarBot :: Xmobar
+xmobarBot     = Xmobar
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc2"
                   , xmobarPP2 = Just xmobarPP'

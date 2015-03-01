@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Sgf.XMonad.Docks.Trayer
-    ( TrayerPID (..)
+    ( Trayer (..)
     )
   where
 
@@ -12,17 +12,16 @@ import System.Posix.Types (ProcessID)
 import XMonad
 import Sgf.XMonad.Restartable
 
--- FIXME: Rename TrayerPID to Trayer.
--- This TrayerPID definition allows to run only one trayer instance, bceause
+-- This Trayer definition allows to run only one trayer instance, bceause
 -- all values of this type are equal.
-newtype TrayerPID    = TrayerPID {trayerPID  :: First ProcessID}
+newtype Trayer    = Trayer {trayerPID  :: First ProcessID}
   deriving (Show, Read, Typeable, Monoid)
-instance Eq TrayerPID where
+instance Eq Trayer where
   _ == _    = True
-instance ProcessClass TrayerPID where
+instance ProcessClass Trayer where
   getPidP        = getFirst . trayerPID
   setPidP mp' x  = x{trayerPID = First mp'}
-instance RestartClass TrayerPID where
+instance RestartClass Trayer where
   runP           = defaultRunP "trayer"
       [ "--edge", "top", "--align", "right"
       , "--SetDockType", "true", "--SetPartialStrut", "true"
