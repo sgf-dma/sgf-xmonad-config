@@ -1,12 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Sgf.XMonad.Docks
     ( handleDocks
-    , XmobarPID (..)
-    , TrayerPID (..)
-    , xmobarPP'
+    , DockClass (..)
     )
   where
 
@@ -15,7 +11,6 @@ import Data.List
 import Data.Monoid
 import Control.Monad.State
 import Control.Applicative
-import System.IO
 import System.Posix.Types (ProcessID)
 
 import XMonad
@@ -27,8 +22,6 @@ import XMonad.Util.WindowProperties (getProp32s)
 import XMonad.Util.XUtils (fi)
 import Foreign.C.Types (CLong)
 
-import Sgf.Data.List
-import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.XMonad.Restartable
 
 -- Take list of keys for toggling all docks and list of xmobar instances,
@@ -53,9 +46,7 @@ handleDocks ts ds cf =
 
       -- Log to all docks according to their PP .
       , logHook = mapM_ dockLog ds >> logHook cf
-      --, startupHook = mapM_ restartP ds >> mapM_ reinitPP ds >> startupHook cf
-      --, startupHook = mapM_ (restartP <* reinitPP)  ds >> startupHook cf
-      -- reinitPP should be done before restart, because i may check or fill
+      -- reinitPP should be done before restartP, because i may check or fill
       -- some PP values in startP.
       , startupHook = mapM_ (liftA2 (<*) reinitPP restartP) ds >> startupHook cf
       }
@@ -64,6 +55,9 @@ handleDocks ts ds cf =
     dockKeys        = fmap concat . sequence $
                         map toggleAllDocks ts ++ map toggleDock ds
 
+-- Because i can't save PP values in persistent Extensible State (there is
+-- neither Show nor Read instance for PP), i need to reinitialize them each
+-- time at the start (in startupHook).
 reinitPP :: DockClass a => a -> X ()
 reinitPP y          = withProcess (\x -> return (setDockPP (getDockPP y) x)) y
 
@@ -142,101 +136,4 @@ dockLog :: DockClass a => a ->  X ()
 dockLog             = withProcess $ \x -> do
     maybe (return ()) dynamicLogWithPP (getDockPP x)
     return x
-
-
--- This XmobarPID definition suitable for launching several xmobars. They will
--- be distinguished by config file name.
-data XmobarPID      = XmobarPID
-                        { xmobarPID     :: First ProcessID
-                        , xmobarConf    :: FilePath
-                        , xmobarPP2     :: Maybe PP
-                        , xmobarToggle  :: Maybe (ButtonMask, KeySym)
-                        }
-  deriving (Typeable)
--- Show and Read instances, which omit Handle.
-instance Show XmobarPID where
-    showsPrec d x   = showParen (d > app_prec) $
-        showString "XmobarPID {xmobarPID = " . showsPrec d (xmobarPID x)
-        . showString ", xmobarConf = " . showsPrec d (xmobarConf x)
-        . showString ", xmobarToggle = " . showsPrec d (xmobarToggle x)
-        . showString "}"
-      where
-        app_prec    = 10
-instance Read XmobarPID where
-    readsPrec d     = readParen (d > app_prec) . runStateT $ do
-        readLexsM ["XmobarPID"]
-        xp <- readLexsM ["{", "xmobarPID", "="] >> readsPrecM d
-        xc <- readLexsM [",", "xmobarConf", "="] >> readsPrecM d
-        xt <- readLexsM [",", "xmobarToggle", "="] >> readsPrecM d
-        readLexsM ["}"]
-        let x = XmobarPID
-                  { xmobarPID       = xp
-                  , xmobarConf      = xc
-                  , xmobarPP2       = Nothing
-                  , xmobarToggle    = xt
-                  }
-        return x
-      where
-        app_prec    = 10
-
-instance Eq XmobarPID where
-    XmobarPID {xmobarConf = xcf} == XmobarPID {xmobarConf = ycf}
-      | xcf == ycf  = True
-      | otherwise   = False
-instance Monoid XmobarPID where
-    mempty          = XmobarPID
-                        { xmobarPID = First Nothing
-                        , xmobarConf = ""
-                        , xmobarPP2  = Nothing
-                        , xmobarToggle = Nothing
-                        }
-    x `mappend` y   = x{xmobarPID = xmobarPID x `mappend` xmobarPID y}
-instance ProcessClass XmobarPID where
-    getPidP         = getFirst . xmobarPID
-    setPidP mp' x   = x{xmobarPID = First mp'}
-instance RestartClass XmobarPID where
-    runP x@(XmobarPID{xmobarConf = xcf, xmobarPP2 = Just xpp}) = do
-        (h, p) <- spawnPipe' "xmobar" [xcf]
-        return (x{ xmobarPID = First (Just p)
-                 , xmobarPP2 = Just (xpp{ppOutput = hPutStrLn h})
-                 })
-    runP x@(XmobarPID{xmobarConf = xcf})
-      | otherwise   = defaultRunP "xmobar" [xcf] x
-    killP           = return . resetPipe <=< defaultKillP
-      where
-        resetPipe :: XmobarPID -> XmobarPID
-        resetPipe x@(XmobarPID{xmobarPP2 = Just xpp}) =
-            x{xmobarPP2 = Just (xpp{ppOutput = const (return ())})}
-        resetPipe x = x
-xmobarPP' :: PP
-xmobarPP' = xmobarPP {ppOutput = const (return ())}
-instance DockClass XmobarPID where
-    dockToggleKey   = xmobarToggle
-    getDockPP       = xmobarPP2
-    setDockPP pp x  = maybe x (\t -> x{xmobarPP2 = Just t}) pp
-
-
--- Copy from xmobar/src/Config.hs . I need to read xmobar config for
--- determining its position.
-
-
--- End copy from xmobar/src/Config.hs .
-
--- This TrayerPID definition allows to run only one trayer instance, bceause
--- all values of this type are equal.
-newtype TrayerPID    = TrayerPID {trayerPID  :: First ProcessID}
-  deriving (Show, Read, Typeable, Monoid)
-instance Eq TrayerPID where
-  _ == _    = True
-instance ProcessClass TrayerPID where
-  getPidP        = getFirst . trayerPID
-  setPidP mp' x  = x{trayerPID = First mp'}
-instance RestartClass TrayerPID where
-  runP           = defaultRunP "trayer"
-      [ "--edge", "top", "--align", "right"
-      , "--SetDockType", "true", "--SetPartialStrut", "true"
-      , "--expand", "true", "--width", "10"
-      , "--transparent", "true" , "--tint", "0x191970"
-      , "--height", "12"
-      ]
 

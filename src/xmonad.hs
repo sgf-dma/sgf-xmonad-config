@@ -14,6 +14,8 @@ import System.Process
 import Data.Monoid
 
 import Sgf.XMonad.Docks
+import Sgf.XMonad.Docks.Xmobar
+import Sgf.XMonad.Docks.Trayer
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
 
