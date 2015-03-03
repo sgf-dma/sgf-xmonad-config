@@ -22,6 +22,7 @@ import XMonad.Util.WindowProperties (getProp32s)
 import XMonad.Util.XUtils (fi)
 import Foreign.C.Types (CLong)
 
+import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
 
 -- Take list of keys for toggling all docks and list of xmobar instances,
@@ -59,7 +60,7 @@ handleDocks ts ds cf =
 -- neither Show nor Read instance for PP), i need to reinitialize them each
 -- time at the start (in startupHook).
 reinitPP :: DockClass a => a -> X ()
-reinitPP y          = withProcess (\x -> return (setDockPP (getDockPP y) x)) y
+reinitPP y          = withProcess (\x -> return (set ppL (view ppL y) x)) y
 
 -- docksEventHook version from xmobar tutorial (5.3.1 "Example for using the
 -- DBus IPC interface with XMonad"), which refreshes screen on unmap events as
@@ -79,8 +80,7 @@ toggleAllDocks (mk, k) XConfig {modMask = m} =
 
 class ProcessClass a => DockClass a where
     dockToggleKey   :: a -> Maybe (ButtonMask, KeySym)
-    getDockPP       :: a -> Maybe PP
-    setDockPP       :: Maybe PP -> a -> a
+    ppL :: Lens a (Maybe PP)
 
 toggleDock :: DockClass a => a -> XConfig l -> [((ButtonMask, KeySym), X ())]
 toggleDock x (XConfig {modMask = m}) = maybeToList $ do
@@ -92,7 +92,7 @@ toggleDock x (XConfig {modMask = m}) = maybeToList $ do
 -- getPidP).
 toggleProcessStruts :: ProcessClass a => a -> X ()
 toggleProcessStruts = withProcess $ \x -> do
-    maybe (return ()) togglePidStruts (getPidP x)
+    maybe (return ()) togglePidStruts (view pidL x)
     return x
 
 -- Toggle all struts, which specified PID have.
@@ -134,6 +134,6 @@ getStrut w = do
 
 dockLog :: DockClass a => a ->  X ()
 dockLog             = withProcess $ \x -> do
-    maybe (return ()) dynamicLogWithPP (getDockPP x)
+    maybe (return ()) dynamicLogWithPP (view ppL x)
     return x
 

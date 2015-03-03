@@ -2,12 +2,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Sgf.XMonad.Docks.Xmobar
-    ( Xmobar (..)
+    ( Xmobar
+    , xmobarConf
+    , xmobarPP2
+    , xmobarToggle
+    , defaultXmobar
     , xmobarPP'
     )
   where
 
-import Data.Monoid
+import Data.Maybe
 import Control.Monad.State
 import System.IO
 import System.Posix.Types (ProcessID)
@@ -16,6 +20,7 @@ import XMonad
 import XMonad.Hooks.DynamicLog
 
 import Sgf.Data.List
+import Sgf.Control.Lens
 import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Docks
@@ -23,84 +28,86 @@ import Sgf.XMonad.Docks
 -- This Xmobar definition suitable for launching several xmobars. They will
 -- be distinguished by config file name.
 data Xmobar      = Xmobar
--- FIXME: Remove Monoid from xmobarPID .
-                        { xmobarPID     :: First ProcessID
-                        , xmobarConf    :: FilePath
--- FIXME: Rename xmobarPP2.
-                        , xmobarPP2     :: Maybe PP
-                        , xmobarToggle  :: Maybe (ButtonMask, KeySym)
+                        { _xmobarPid     :: Maybe ProcessID
+                        , _xmobarConf    :: FilePath
+-- FIXME: Rename _xmobarPP2.
+                        , _xmobarPP2     :: Maybe PP
+                        , _xmobarToggle  :: Maybe (ButtonMask, KeySym)
                         }
   deriving (Typeable)
--- Show and Read instances, which omit Handle.
+xmobarPid :: Lens Xmobar (Maybe ProcessID)
+xmobarPid f z@(Xmobar {_xmobarPid = x})
+                    = fmap (\x' -> z{_xmobarPid = x'}) (f x)
+xmobarConf :: Lens Xmobar FilePath
+xmobarConf f z@(Xmobar {_xmobarConf = x})
+                    = fmap (\x' -> z{_xmobarConf = x'}) (f x)
+xmobarPP2 :: Lens Xmobar (Maybe PP)
+xmobarPP2 f z@(Xmobar {_xmobarPP2 = x})
+                    = fmap (\x' -> z{_xmobarPP2 = x'}) (f x)
+xmobarToggle :: Lens Xmobar (Maybe (ButtonMask, KeySym))
+xmobarToggle f z@(Xmobar {_xmobarToggle = x})
+                    = fmap (\x' -> z{_xmobarToggle = x'}) (f x)
+-- FIXME: Does this good default?
+defaultXmobar :: Xmobar
+defaultXmobar       = Xmobar
+                        { _xmobarPid    = Nothing
+                        , _xmobarConf   = ".xmobarrc"
+                        , _xmobarPP2    = Just xmobarPP
+                        , _xmobarToggle = Nothing
+                        }
+
+-- Show and Read instances omiting some non-showable/non-readable records.
 instance Show Xmobar where
     showsPrec d x   = showParen (d > app_prec) $
-        showString "Xmobar {xmobarPID = " . showsPrec d (xmobarPID x)
-        . showString ", xmobarConf = " . showsPrec d (xmobarConf x)
-        . showString ", xmobarToggle = " . showsPrec d (xmobarToggle x)
+        showString "Xmobar {_xmobarPid = "  . showsPrec d (view xmobarPid x)
+        . showString ", _xmobarConf = "     . showsPrec d (view xmobarConf x)
+        . showString ", _xmobarToggle = "   . showsPrec d (view xmobarToggle x)
         . showString "}"
       where
         app_prec    = 10
 instance Read Xmobar where
     readsPrec d     = readParen (d > app_prec) . runStateT $ do
         readLexsM ["Xmobar"]
-        xp <- readLexsM ["{", "xmobarPID", "="] >> readsPrecM d
-        xc <- readLexsM [",", "xmobarConf", "="] >> readsPrecM d
-        xt <- readLexsM [",", "xmobarToggle", "="] >> readsPrecM d
+        xp <- readLexsM ["{", "_xmobarPid", "="] >> readsPrecM d
+        xc <- readLexsM [",", "_xmobarConf", "="] >> readsPrecM d
+        xt <- readLexsM [",", "_xmobarToggle", "="] >> readsPrecM d
         readLexsM ["}"]
-        let x = Xmobar
-                  { xmobarPID       = xp
-                  , xmobarConf      = xc
-                  , xmobarPP2       = Nothing
-                  , xmobarToggle    = xt
-                  }
+        let x = set xmobarPid xp
+                  . set xmobarConf xc
+                  . set xmobarToggle xt
+                  $ defaultXmobar
         return x
       where
         app_prec    = 10
 
 instance Eq Xmobar where
-    Xmobar {xmobarConf = xcf} == Xmobar {xmobarConf = ycf}
-      | xcf == ycf  = True
+    x == y
+      | view xmobarConf x == view xmobarConf y = True
       | otherwise   = False
--- FIXME: Remove Monoid.
-instance Monoid Xmobar where
-    mempty          = Xmobar
-                        { xmobarPID = First Nothing
-                        , xmobarConf = ""
-                        , xmobarPP2  = Nothing
-                        , xmobarToggle = Nothing
-                        }
-    x `mappend` y   = x{xmobarPID = xmobarPID x `mappend` xmobarPID y}
 instance ProcessClass Xmobar where
-    getPidP         = getFirst . xmobarPID
-    setPidP mp' x   = x{xmobarPID = First mp'}
+    pidL            = xmobarPid
 instance RestartClass Xmobar where
-    runP x@(Xmobar{xmobarConf = xcf, xmobarPP2 = Just xpp}) = do
-        (h, p) <- spawnPipe' "xmobar" [xcf]
-        return (x{ xmobarPID = First (Just p)
-                 , xmobarPP2 = Just (xpp{ppOutput = hPutStrLn h})
-                 })
-    runP x@(Xmobar{xmobarConf = xcf})
-      | otherwise   = defaultRunP "xmobar" [xcf] x
+    runP x
+      | isJust (view xmobarPP2 x) = do
+          (h, p) <- spawnPipe' "xmobar" [view xmobarConf x]
+          let xpp' = do
+                       xpp <- view xmobarPP2 x
+                       return (xpp{ppOutput = hPutStrLn h})
+          return
+            . set xmobarPid (Just p)
+            . set xmobarPP2 xpp'
+            $ x
+      | otherwise   = defaultRunP "xmobar" [view xmobarConf x] x
     killP           = return . resetPipe <=< defaultKillP
       where
         resetPipe :: Xmobar -> Xmobar
-        resetPipe x@(Xmobar{xmobarPP2 = Just xpp}) =
-            x{xmobarPP2 = Just (xpp{ppOutput = const (return ())})}
+        resetPipe x@(Xmobar{_xmobarPP2 = Just xpp}) =
+            x{_xmobarPP2 = Just (xpp{ppOutput = const (return ())})}
         resetPipe x = x
 -- FIXME: Repeats resetPipe.
--- FIXME: Provide emptyXmobar value (like mempty).
--- FIXME: Use Lenses.
 xmobarPP' :: PP
 xmobarPP' = xmobarPP {ppOutput = const (return ())}
 instance DockClass Xmobar where
-    dockToggleKey   = xmobarToggle
-    getDockPP       = xmobarPP2
-    setDockPP pp x  = maybe x (\t -> x{xmobarPP2 = Just t}) pp
-
-
--- Copy from xmobar/src/Config.hs . I need to read xmobar config for
--- determining its position.
-
-
--- End copy from xmobar/src/Config.hs .
+    dockToggleKey   = view xmobarToggle
+    ppL             = xmobarPP2
 

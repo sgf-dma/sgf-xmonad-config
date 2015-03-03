@@ -11,8 +11,6 @@ import Control.Applicative
 import System.FilePath ((</>))
 import System.Process
 
-import Data.Monoid
-
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
@@ -57,32 +55,27 @@ traceXS l = do
   --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
 
 xmobarTop :: Xmobar
-xmobarTop     = Xmobar
-                  { xmobarPID = First Nothing
-                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
-                  , xmobarPP2 = Just xmobarPP'
+xmobarTop           = set xmobarConf (".xmobarrc")
+                        . set xmobarPP2 (Just pp)
+                        . set xmobarToggle (Just (shiftMask, xK_v))
+                        -- . set xmobarToggle Nothing
+                        $ defaultXmobar
+  where
+    pp :: PP
+    pp              = xmobarPP'
                         { ppTitle  = xmobarColor "green" "" . shorten 50
                         }
-                  , xmobarToggle = Just (shiftMask, xK_v)
-                  }
-
-xmobarTop2 :: Xmobar
-xmobarTop2    = Xmobar
-                  { xmobarPID = First Nothing
-                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
-                  , xmobarPP2 = Nothing
-                  , xmobarToggle = Nothing
-                  }
 
 xmobarBot :: Xmobar
-xmobarBot     = Xmobar
-                  { xmobarPID = First Nothing
-                  , xmobarConf = "/home/sgf" </> ".xmobarrc2"
-                  , xmobarPP2 = Just xmobarPP'
+xmobarBot     = set xmobarConf (".xmobarrc2")
+                  . set xmobarPP2 (Just pp)
+                  . set xmobarToggle (Just (shiftMask, xK_b))
+                  $ defaultXmobar
+   where
+    pp :: PP
+    pp              = xmobarPP'
                         { ppTitle  = xmobarColor "red" "" . shorten 50
                         }
-                  , xmobarToggle = Just (shiftMask, xK_b)
-                  }
 
 -- Layouts definition from defaultConfig with Full layout without borders.
 layout = tiled ||| Mirror tiled ||| noBorders Full
