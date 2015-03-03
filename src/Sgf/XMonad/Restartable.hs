@@ -50,8 +50,7 @@ instance (Show a, Read a, Typeable a) => ExtensionClass (ListP a) where
 -- instance. But ProcessClass has these requirments, because i need
 -- withProcess to work on its instances.
 class (Eq a, Show a, Read a, Typeable a) => ProcessClass a where
-    getPidP           :: a -> Maybe ProcessID
-    setPidP           :: Maybe ProcessID -> a -> a
+    pidL :: Lens a (Maybe ProcessID)
 
 -- Run function on processes equal to given one. If there is no such processes
 -- in extensible state, add given process there and run function on it.
@@ -63,27 +62,28 @@ withProcess f y     = do
 
 class ProcessClass a => RestartClass a where
     runP  :: a -> X a
-    -- restartP3' relies on PID 'Nothing' after killP, because it then calls
-    -- startP3' and it won't do anything, if PID will still exist. So, here i
-    -- should either set it to Nothing, or wait until it really terminates.
+    -- restartP' relies on PID 'Nothing' after killP, because it then calls
+    -- startP' and it won't do anything, if PID will still exist. So, here i
+    -- should either set it to Nothing, or wait until it really terminates
+    -- (defaultKillP does first).
     killP :: a -> X a
     killP             = defaultKillP
 
 defaultKillP :: ProcessClass a => a -> X a
 defaultKillP x      = io $ do
-                        whenJust (getPidP x) $ signalProcess sigTERM
-                        return (setPidP Nothing x)
+                        whenJust (view pidL x) $ signalProcess sigTERM
+                        return (set pidL Nothing x)
 defaultRunP :: ProcessClass a => FilePath -> [String] -> a -> X a
 defaultRunP x xs z  = do
                         p <- spawnPID' x xs
-                        return (setPidP (Just p) z)
+                        return (set pidL (Just p) z)
 
 -- Based on doesPidProgRun .
 refreshPid :: (MonadIO m, ProcessClass a) => a -> m a
-refreshPid x        = case (getPidP x) of
+refreshPid x        = case (view pidL x) of
     Nothing -> return x
     Just p  -> liftIO $ do
-      either (const (setPidP Nothing x)) (const x)
+      either (const (set pidL Nothing x)) (const x)
       `fmap` (try $ getProcessPriority p :: IO (Either IOException Int))
 
 -- Here are versions of start/stop working on argument, not extensible state.
@@ -91,7 +91,7 @@ refreshPid x        = case (getPidP x) of
 startP' :: RestartClass a => a -> X a
 startP' x           = do
   x' <- refreshPid x
-  case (getPidP x') of
+  case (view pidL x') of
     Nothing   -> runP x'
     Just _    -> return x'
 

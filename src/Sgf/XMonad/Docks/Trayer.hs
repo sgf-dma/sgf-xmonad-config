@@ -6,21 +6,23 @@ module Sgf.XMonad.Docks.Trayer
     )
   where
 
-import Data.Monoid
 import System.Posix.Types (ProcessID)
 
 import XMonad
+import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
 
 -- This Trayer definition allows to run only one trayer instance, bceause
 -- all values of this type are equal.
-newtype Trayer    = Trayer {trayerPID  :: First ProcessID}
-  deriving (Show, Read, Typeable, Monoid)
+newtype Trayer    = Trayer {_trayerPid  :: Maybe ProcessID}
+  deriving (Show, Read, Typeable)
+trayerPid :: Lens Trayer (Maybe ProcessID)
+trayerPid f z@(Trayer {_trayerPid = x})
+                    = fmap (\x' -> z{_trayerPid = x'}) (f x)
 instance Eq Trayer where
   _ == _    = True
 instance ProcessClass Trayer where
-  getPidP        = getFirst . trayerPID
-  setPidP mp' x  = x{trayerPID = First mp'}
+  pidL              = trayerPid
 instance RestartClass Trayer where
   runP           = defaultRunP "trayer"
       [ "--edge", "top", "--align", "right"
