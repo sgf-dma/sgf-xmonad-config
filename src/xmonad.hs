@@ -1,43 +1,86 @@
 
 import XMonad
-import XMonad.Hooks.DynamicLog
-import XMonad.Hooks.ManageDocks
 import XMonad.Layout.NoBorders
-import XMonad.Util.Run (spawnPipe)
 import qualified XMonad.StackSet as W
+import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Hooks.DynamicLog
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
-import System.IO (hPutStrLn)
-import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 import System.Process
 
+import Data.Monoid
+
 import Sgf.XMonad.Docks
+import Sgf.Control.Lens
+import Sgf.XMonad.Restartable
 
 main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
-    xmPipe <- spawnPipe ("xmobar ~/.xmobarrc")
     xmonad
-      . handleDocks
+      . handleDocks [(0, xK_b)] [xmobarTop, xmobarBot]
       . alterKeys myKeys
       $ defaultConfig
           { layoutHook = layout
-          , logHook    = dynamicLogWithPP xmobarPP
-                           { ppOutput = hPutStrLn xmPipe
-                           , ppTitle  = xmobarColor "green" ""
-                                          . shorten 50
-                           }
           -- Workspace "lock" is for xtrlock only and it is inaccessible for
           -- workspace switch keys.
           , workspaces = map show [1..9] ++ ["lock"]
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
+	  , logHook = traceXS "Huh"
           --, layoutHook = smartBorders $ layoutHook xfceConfig
           }
+
+
+traceXS :: String -> X ()
+traceXS l = do
+    trace l
+    xs <- XS.get
+    mapM_ (trace . show) (view processList xs :: [XmobarPID])
+    ts <- XS.get
+    mapM_ (trace . show) (view processList ts :: [TrayerPID])
+    --fs <- XS.get
+    --mapM_ (trace . show) (fs :: [FehPID])
+    {-
+    trace "For trayer:"
+    forM_ ts $ \x -> whenJust (getPidP x) pidStatus
+    trace "For feh:"
+    forM_ fs $ \x -> whenJust (getPidP x) pidStatus-}
+  --where
+  --  pidStatus :: ProcessID -> X ()
+  --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
+
+xmobarTop :: XmobarPID
+xmobarTop     = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
+                  , xmobarPP2 = Just xmobarPP'
+                        { ppTitle  = xmobarColor "green" "" . shorten 50
+                        }
+                  , xmobarToggle = Just (shiftMask, xK_v)
+                  }
+
+xmobarTop2 :: XmobarPID
+xmobarTop2    = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc"
+                  , xmobarPP2 = Nothing
+                  , xmobarToggle = Nothing
+                  }
+
+xmobarBot :: XmobarPID
+xmobarBot     = XmobarPID
+                  { xmobarPID = First Nothing
+                  , xmobarConf = "/home/sgf" </> ".xmobarrc2"
+                  , xmobarPP2 = Just xmobarPP'
+                        { ppTitle  = xmobarColor "red" "" . shorten 50
+                        }
+                  , xmobarToggle = Just (shiftMask, xK_b)
+                  }
 
 -- Layouts definition from defaultConfig with Full layout without borders.
 layout = tiled ||| Mirror tiled ||| noBorders Full
@@ -96,6 +139,7 @@ myKeys (XConfig {modMask = m}) =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
+      , ((m,           xK_v), stopP xmobarBot)
 
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
