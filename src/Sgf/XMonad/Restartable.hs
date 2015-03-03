@@ -9,6 +9,7 @@ module Sgf.XMonad.Restartable
     , processList
     , RestartClass (..)
     , defaultRunP
+    , defaultKillP
     , startP
     , startP'
     , stopP
@@ -61,15 +62,17 @@ withProcess f y     = do
     XS.put (set processList ps x)
 
 class ProcessClass a => RestartClass a where
-    runP              :: a -> X a
+    runP  :: a -> X a
     -- restartP3' relies on PID 'Nothing' after killP, because it then calls
     -- startP3' and it won't do anything, if PID will still exist. So, here i
     -- should either set it to Nothing, or wait until it really terminates.
-    killP             :: a -> X a
-    killP x           = io $ do
+    killP :: a -> X a
+    killP             = defaultKillP
+
+defaultKillP :: ProcessClass a => a -> X a
+defaultKillP x      = io $ do
                         whenJust (getPidP x) $ signalProcess sigTERM
                         return (setPidP Nothing x)
-
 defaultRunP :: ProcessClass a => FilePath -> [String] -> a -> X a
 defaultRunP x xs z  = do
                         p <- spawnPID' x xs

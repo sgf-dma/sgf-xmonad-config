@@ -3,6 +3,7 @@ import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
 import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Hooks.DynamicLog
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
@@ -11,7 +12,6 @@ import System.FilePath ((</>))
 import System.Process
 
 import Data.Monoid
-import XMonad.Layout.LayoutScreens
 
 import Sgf.XMonad.Docks
 import Sgf.Control.Lens
@@ -58,7 +58,9 @@ xmobarTop :: XmobarPID
 xmobarTop     = XmobarPID
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
-                  , xmobarPipe = (True, Nothing)
+                  , xmobarPP2 = Just xmobarPP'
+                        { ppTitle  = xmobarColor "green" "" . shorten 50
+                        }
                   , xmobarToggle = Just (shiftMask, xK_v)
                   }
 
@@ -66,7 +68,7 @@ xmobarTop2 :: XmobarPID
 xmobarTop2    = XmobarPID
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc"
-                  , xmobarPipe = (False, Nothing)
+                  , xmobarPP2 = Nothing
                   , xmobarToggle = Nothing
                   }
 
@@ -74,7 +76,9 @@ xmobarBot :: XmobarPID
 xmobarBot     = XmobarPID
                   { xmobarPID = First Nothing
                   , xmobarConf = "/home/sgf" </> ".xmobarrc2"
-                  , xmobarPipe = (True, Nothing)
+                  , xmobarPP2 = Just xmobarPP'
+                        { ppTitle  = xmobarColor "red" "" . shorten 50
+                        }
                   , xmobarToggle = Just (shiftMask, xK_b)
                   }
 
@@ -135,6 +139,7 @@ myKeys (XConfig {modMask = m}) =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
+      , ((m,           xK_v), stopP xmobarBot)
 
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
