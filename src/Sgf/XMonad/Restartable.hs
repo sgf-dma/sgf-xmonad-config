@@ -2,11 +2,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Sgf.XMonad.Restartable
-    ( ProcessClass (..)
-    , withProcess
-    , ListP
+    ( ListP
     , emptyListP
     , processList
+    , ProcessClass (..)
+    , withProcess
     , RestartClass (..)
     , defaultRunP
     , defaultKillP
@@ -50,10 +50,10 @@ instance (Show a, Read a, Typeable a) => ExtensionClass (ListP a) where
 -- instance. But ProcessClass has these requirments, because i need
 -- withProcess to work on its instances.
 class (Eq a, Show a, Read a, Typeable a) => ProcessClass a where
-    pidL :: Lens a (Maybe ProcessID)
+    pidL            :: Lens a (Maybe ProcessID)
 
--- Run function on processes equal to given one. If there is no such processes
--- in extensible state, add given process there and run function on it.
+-- Run function on processes stored in Extensible State equal to given one. If
+-- there is no such processes, add given process there and run function on it.
 withProcess :: ProcessClass a => (a -> X a) -> a -> X ()
 withProcess f y     = do
     x  <- XS.get
@@ -62,23 +62,24 @@ withProcess f y     = do
 
 class ProcessClass a => RestartClass a where
     runP  :: a -> X a
-    -- restartP' relies on PID 'Nothing' after killP, because it then calls
-    -- startP' and it won't do anything, if PID will still exist. So, here i
-    -- should either set it to Nothing, or wait until it really terminates
+    -- restartP' relies on Pid 'Nothing' after killP, because it then calls
+    -- startP' and it won't do anything, if PID will still exist. So, in killP
+    -- i should either set Pid to Nothing, or wait until it really terminates
     -- (defaultKillP does first).
     killP :: a -> X a
     killP             = defaultKillP
 
-defaultKillP :: ProcessClass a => a -> X a
-defaultKillP x      = io $ do
-                        whenJust (view pidL x) $ signalProcess sigTERM
-                        return (set pidL Nothing x)
 defaultRunP :: ProcessClass a => FilePath -> [String] -> a -> X a
 defaultRunP x xs z  = do
                         p <- spawnPID' x xs
                         return (set pidL (Just p) z)
+defaultKillP :: ProcessClass a => a -> X a
+defaultKillP x      = io $ do
+                        whenJust (view pidL x) $ signalProcess sigTERM
+                        return (set pidL Nothing x)
 
--- Based on doesPidProgRun .
+-- Based on doesPidProgRun by Thomas Bach
+-- (https://github.com/fuzzy-id/my-xmonad) .
 refreshPid :: (MonadIO m, ProcessClass a) => a -> m a
 refreshPid x        = case (view pidL x) of
     Nothing -> return x
@@ -105,13 +106,13 @@ stopP'              = killP <=< refreshPid
 restartP' :: RestartClass a => a -> X a
 restartP'           = startP' <=< stopP'
 
--- Here are versions of start/restart working on extensible state.
--- Usually, these should be used.
-stopP :: RestartClass a => a -> X ()
-stopP               = withProcess stopP'
-
+-- Here are versions of start/stop working on extensible state.  Usually,
+-- these should be used.
 startP :: RestartClass a => a -> X ()
 startP              = withProcess startP'
+
+stopP :: RestartClass a => a -> X ()
+stopP               = withProcess stopP'
 
 restartP :: RestartClass a => a -> X ()
 restartP            = withProcess restartP'
