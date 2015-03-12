@@ -3,12 +3,11 @@ import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
 import qualified XMonad.Util.ExtensibleState as XS
-import XMonad.Hooks.DynamicLog
+import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
-import System.FilePath ((</>))
 import System.Process
 
 import Sgf.XMonad.Docks
@@ -40,9 +39,9 @@ traceXS :: String -> X ()
 traceXS l = do
     trace l
     xs <- XS.get
-    mapM_ (trace . show) (view processList xs :: [Xmobar])
+    mapM_ (trace . show) (viewA processList xs :: [Xmobar])
     ts <- XS.get
-    mapM_ (trace . show) (view processList ts :: [Trayer])
+    mapM_ (trace . show) (viewA processList ts :: [Trayer])
     --fs <- XS.get
     --mapM_ (trace . show) (fs :: [FehPID])
     {-
@@ -55,27 +54,23 @@ traceXS l = do
   --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
 
 xmobarTop :: Xmobar
-xmobarTop           = set xmobarConf (".xmobarrc")
-                        . set xmobarPP2 (Just pp)
-                        . set xmobarToggle (Just (shiftMask, xK_v))
+xmobarTop           = setA xmobarConf (".xmobarrc")
+                        . setA (xmobarPP . maybeL . ppTitleL) t
+                        . setA xmobarToggle (Just (shiftMask, xK_v))
                         -- . set xmobarToggle Nothing
                         $ defaultXmobar
   where
-    pp :: PP
-    pp              = xmobarPP'
-                        { ppTitle  = xmobarColor "green" "" . shorten 50
-                        }
+    t :: String -> String
+    t               = xmobarColor "green" "" . shorten 50
 
 xmobarBot :: Xmobar
-xmobarBot     = set xmobarConf (".xmobarrc2")
-                  . set xmobarPP2 (Just pp)
-                  . set xmobarToggle (Just (shiftMask, xK_b))
+xmobarBot     = setA xmobarConf (".xmobarrc2")
+                  . setA (xmobarPP . maybeL . ppTitleL) t
+                  . setA xmobarToggle (Just (shiftMask, xK_b))
                   $ defaultXmobar
    where
-    pp :: PP
-    pp              = xmobarPP'
-                        { ppTitle  = xmobarColor "red" "" . shorten 50
-                        }
+    t :: String -> String
+    t               = xmobarColor "red" "" . shorten 50
 
 -- Layouts definition from defaultConfig with Full layout without borders.
 layout = tiled ||| Mirror tiled ||| noBorders Full
@@ -134,7 +129,8 @@ myKeys (XConfig {modMask = m}) =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_v), stopP xmobarBot)
+      , ((m,           xK_n), stopP xmobarBot)
+      , ((m .|. shiftMask, xK_n), startP xmobarBot)
 
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")

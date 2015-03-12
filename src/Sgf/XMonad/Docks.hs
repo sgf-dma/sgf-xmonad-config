@@ -3,6 +3,19 @@
 module Sgf.XMonad.Docks
     ( handleDocks
     , DockClass (..)
+    , ppCurrentL
+    , ppVisibleL
+    , ppHiddenL
+    , ppHiddenNoWindowsL
+    , ppUrgentL
+    , ppSepL
+    , ppWsSepL
+    , ppTitleL
+    , ppLayoutL
+    , ppOrderL
+    , ppSortL
+    , ppExtrasL
+    , ppOutputL
     )
   where
 
@@ -58,7 +71,7 @@ handleDocks ts ds cf =
 
 class ProcessClass a => DockClass a where
     dockToggleKey   :: a -> Maybe (ButtonMask, KeySym)
-    ppL             :: Lens a (Maybe PP)
+    ppL             :: LensA a (Maybe PP)
 
 toggleAllDocks :: (ButtonMask, KeySym) -> XConfig l
                -> [((ButtonMask, KeySym), X ())]
@@ -73,7 +86,7 @@ toggleDock x (XConfig {modMask = m}) = maybeToList $ do
 -- Toggle struts for any ProcessClass instance.
 toggleProcessStruts :: ProcessClass a => a -> X ()
 toggleProcessStruts = withProcess $ \x -> do
-    maybe (return ()) togglePidStruts (view pidL x)
+    maybe (return ()) togglePidStruts (viewA pidL x)
     return x
   where
     -- Toggle all struts, which specified PID have.
@@ -126,12 +139,54 @@ docksEventHook e = do
 
 dockLog :: DockClass a => a ->  X ()
 dockLog             = withProcess $ \x -> do
-    maybe (return ()) dynamicLogWithPP (view ppL x)
+    maybe (return ()) dynamicLogWithPP (viewA ppL x)
     return x
 
 -- Because i can't save PP values in persistent Extensible State (there is
 -- neither Show nor Read instance for PP), i need to reinitialize them each
 -- time at the start (in startupHook).
 reinitPP :: DockClass a => a -> X ()
-reinitPP y          = withProcess (\x -> return (set ppL (view ppL y) x)) y
+reinitPP y          = withProcess (\x -> return (setA ppL (viewA ppL y) x)) y
+
+
+-- Lenses to PP.
+ppCurrentL :: LensA PP (WorkspaceId -> String)
+ppCurrentL f z@(PP {ppCurrent = x})
+                    = fmap (\x' -> z{ppCurrent = x'}) (f x)
+ppVisibleL :: LensA PP (WorkspaceId -> String)
+ppVisibleL f z@(PP {ppVisible = x})
+                    = fmap (\x' -> z{ppVisible = x'}) (f x)
+ppHiddenL :: LensA PP (WorkspaceId -> String)
+ppHiddenL f z@(PP {ppHidden = x})
+                    = fmap (\x' -> z{ppHidden = x'}) (f x)
+ppHiddenNoWindowsL :: LensA PP (WorkspaceId -> String)
+ppHiddenNoWindowsL f z@(PP {ppHiddenNoWindows = x})
+                    = fmap (\x' -> z{ppHiddenNoWindows = x'}) (f x)
+ppUrgentL :: LensA PP (WorkspaceId -> String)
+ppUrgentL f z@(PP {ppUrgent = x})
+                    = fmap (\x' -> z{ppUrgent = x'}) (f x)
+ppSepL :: LensA PP (String)
+ppSepL f z@(PP {ppSep = x})
+                    = fmap (\x' -> z{ppSep = x'}) (f x)
+ppWsSepL :: LensA PP (String)
+ppWsSepL f z@(PP {ppWsSep = x})
+                    = fmap (\x' -> z{ppWsSep = x'}) (f x)
+ppTitleL :: LensA PP (String -> String)
+ppTitleL f z@(PP {ppTitle = x})
+                    = fmap (\x' -> z{ppTitle = x'}) (f x)
+ppLayoutL :: LensA PP (String -> String)
+ppLayoutL f z@(PP {ppLayout = x})
+                    = fmap (\x' -> z{ppLayout = x'}) (f x)
+ppOrderL :: LensA PP ([String] -> [String])
+ppOrderL f z@(PP {ppOrder = x})
+                    = fmap (\x' -> z{ppOrder = x'}) (f x)
+ppSortL :: LensA PP (X ([WindowSpace] -> [WindowSpace]))
+ppSortL f z@(PP {ppSort = x})
+                    = fmap (\x' -> z{ppSort = x'}) (f x)
+ppExtrasL :: LensA PP ([X (Maybe String)])
+ppExtrasL f z@(PP {ppExtras = x})
+                    = fmap (\x' -> z{ppExtras = x'}) (f x)
+ppOutputL :: LensA PP (String -> IO ())
+ppOutputL f z@(PP {ppOutput = x})
+                    = fmap (\x' -> z{ppOutput = x'}) (f x)
 
