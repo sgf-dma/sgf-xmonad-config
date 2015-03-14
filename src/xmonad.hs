@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 
 import XMonad
 import XMonad.Layout.NoBorders
@@ -20,7 +21,7 @@ main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
     xmonad
-      . handleDocks [(0, xK_b)] [xmobarTop, xmobarBot]
+      . handleDocks (0, xK_b) myDocks
       . alterKeys myKeys
       $ defaultConfig
           { layoutHook = layout
@@ -33,25 +34,25 @@ main                = do
 	  , logHook = traceXS "Huh"
           --, layoutHook = smartBorders $ layoutHook xfceConfig
           }
+  where
+    myDocks :: LayoutClass l Window => [DockConfig l]
+    myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
 
 
 traceXS :: String -> X ()
 traceXS l = do
+    withWindowSet $ \ws -> do
+      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
+        ts <- mapM (runQuery title) (W.integrate s)
+        trace "Tiled:"
+        trace (show ts)
+      trace "Floating:"
+      trace . show $ (M.keys . W.floating $ ws)
     trace l
-    xs <- XS.get
-    mapM_ (trace . show) (viewA processList xs :: [Xmobar])
-    ts <- XS.get
-    mapM_ (trace . show) (viewA processList ts :: [Trayer])
-    --fs <- XS.get
-    --mapM_ (trace . show) (fs :: [FehPID])
-    {-
-    trace "For trayer:"
-    forM_ ts $ \x -> whenJust (getPidP x) pidStatus
-    trace "For feh:"
-    forM_ fs $ \x -> whenJust (getPidP x) pidStatus-}
-  --where
-  --  pidStatus :: ProcessID -> X ()
-  --  pidStatus p = io (getProcessStatus False False p)  >>= trace . show
+    xs <- XS.gets (viewA xmobarsList)
+    mapM_ (trace . show) xs
+    ts <- XS.gets (viewA trayersList)
+    mapM_ (trace . show) ts
 
 xmobarTop :: Xmobar
 xmobarTop           = setA xmobarConf (".xmobarrc")
@@ -72,6 +73,8 @@ xmobarBot     = setA xmobarConf (".xmobarrc2")
     t :: String -> String
     t               = xmobarColor "red" "" . shorten 50
 
+trayer :: Trayer
+trayer              = defaultTrayer
 -- Layouts definition from defaultConfig with Full layout without borders.
 layout = tiled ||| Mirror tiled ||| noBorders Full
   where	

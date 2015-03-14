@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Sgf.XMonad.Docks
-    ( handleDocks
+    ( DockConfig
+    , addDock
+    , handleDocks
     , DockClass (..)
     , ppCurrentL
     , ppVisibleL
@@ -38,16 +40,34 @@ import Foreign.C.Types (CLong)
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
 
--- Take list of keys for toggling visibility (Struts, in particular) for all
--- docks and list of docks to start. Each dock may have its own (Strut)
--- toggle.
-handleDocks :: (RestartClass a, DockClass a, LayoutClass l Window) =>
-               [(ButtonMask, KeySym)]   -- Toggle docks key(s).
-               -> [a]                   -- Docks to start.
-               -> XConfig l
-               -> XConfig (ModifiedLayout AvoidStruts l)
-handleDocks ts ds cf = 
-    additionalKeys <*> dockKeys $ cf
+
+-- Store some records of XConfig modified for particular dock.
+data DockConfig l   = DockConfig
+                        { dockLogHook :: X ()
+                        , dockStartupHook :: X ()
+                        , dockKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
+                        }
+
+-- Create DockConfig from DockClass instance.
+addDock :: (RestartClass a, DockClass a, LayoutClass l Window) =>
+               a -> DockConfig l
+addDock d           = DockConfig
+      -- Log to dock according to its PP .
+      { dockLogHook     = dockLog d
+      -- Restart dock at xmonad startup. reinitPP should be done before
+      -- restartP, because i may check or fill some PP values in dock's
+      -- RestartClass instance (runP, particularly).
+      , dockStartupHook = liftA2 (<*) reinitPP restartP d
+      -- Key for toggling Struts of this Dock.
+      , dockKeys        = toggleDock d
+      }
+
+-- Merge DockConfig-s into existing XConfig properly. Also takes a key for
+-- toggling visibility (Struts) of all docks.
+handleDocks :: LayoutClass l Window => (ButtonMask, KeySym)
+               -> [DockConfig (ModifiedLayout AvoidStruts l)]
+               -> XConfig l -> XConfig (ModifiedLayout AvoidStruts l)
+handleDocks t ds cf = addDockKeys $ cf
       -- First, de-manage dock applications.
       { manageHook = manageDocks <+> manageHook cf
       -- Then refresh screens after new dock appears.
@@ -55,19 +75,17 @@ handleDocks ts ds cf =
       -- Reduce Rectangle available for other windows according to Struts.
       , layoutHook = avoidStruts (layoutHook cf)
       -- Log to all docks according to their PP .
-      , logHook = mapM_ dockLog ds >> logHook cf
-      -- Restart all docks at xmonad startup. reinitPP should be done before
-      -- restartP, because i may check or fill some PP values in dock's
-      -- RestartClass instance (runP, particularly).
-      , startupHook = mapM_ (liftA2 (<*) reinitPP restartP) ds >>
-                        startupHook cf
+      , logHook = mapM_ dockLogHook ds >> logHook cf
+      -- Restart all docks at xmonad startup.
+      , startupHook = mapM_ dockStartupHook ds >> startupHook cf
       }
   where
-    -- Add keys for toggling Struts for all docks and for each dock, if
+    -- Join keys for toggling Struts of all docks and of each dock, if
     -- defined.
-    dockKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
-    dockKeys        = fmap concat . sequence $
-                        map toggleAllDocks ts ++ map toggleDock ds
+    --addDockKeys :: XConfig l1 -> XConfig l1
+    addDockKeys     = additionalKeys <*> (concat <$> sequence
+                        (toggleAllDocks t : map dockKeys ds))
+
 
 class ProcessClass a => DockClass a where
     dockToggleKey   :: a -> Maybe (ButtonMask, KeySym)

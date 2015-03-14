@@ -12,6 +12,7 @@ module Sgf.Control.Lens
     , modifyA
     , modifyAA
     , maybeL
+    , nothingL
     )
   where
 
@@ -54,4 +55,10 @@ setA l s            = modifyA l (const s)
 -- returned. Thus, i need Applicative.
 maybeL :: LensA (Maybe a) a
 maybeL f x          = maybe (pure x) (fmap Just . f) x
+
+-- Lens from some type to Maybe, which always sees Nothing and ignores changes
+-- of Maybe record.  It may be used for value, which does not have (Maybe a)
+-- record at all.
+nothingL :: LensA a (Maybe b)
+nothingL f x        = fmap (const x) (f Nothing)
 

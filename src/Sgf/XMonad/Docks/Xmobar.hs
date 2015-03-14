@@ -7,6 +7,7 @@ module Sgf.XMonad.Docks.Xmobar
     , xmobarPP
     , xmobarToggle
     , defaultXmobar
+    , xmobarsList
     )
   where
 
@@ -120,4 +121,8 @@ instance RestartClass Xmobar where
 instance DockClass Xmobar where
     dockToggleKey   = viewA xmobarToggle
     ppL             = xmobarPP
+
+-- Lens for obtaining list of all Xmobars stored in extensible state.
+xmobarsList :: LensA (ListP Xmobar) [Xmobar]
+xmobarsList         = processList
 
