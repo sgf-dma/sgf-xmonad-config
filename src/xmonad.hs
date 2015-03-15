@@ -20,6 +20,7 @@ import Sgf.XMonad.Restartable
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
+import Sgf.XMonad.Session
 
 main :: IO ()
 main                = do
@@ -36,8 +37,8 @@ main                = do
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
-	  , logHook = traceXS "Huh"
-          --, layoutHook = smartBorders $ layoutHook xfceConfig
+          , logHook = traceXS "traceXS"
+          , startupHook = restartP' feh >> return ()
           }
 
 -- Modify layoutHook to remove borders around floating windows covering whole
@@ -70,6 +71,26 @@ xmobarBot     = setA xmobarConf (".xmobarrc2")
     t               = xmobarColor "red" "" . shorten 50
 trayer :: Trayer
 trayer              = defaultTrayer
+feh :: Feh
+feh                 = defaultFeh
+
+traceXS :: String -> X ()
+traceXS l = do
+    withWindowSet $ \ws -> do
+      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
+        ts <- mapM (runQuery title) (W.integrate s)
+        trace "Tiled:"
+        trace (show ts)
+      trace "Floating:"
+      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
+      trace (show fs)
+    trace l
+    xs <- XS.gets (viewA xmobarsList)
+    mapM_ (trace . show) xs
+    ts <- XS.gets (viewA trayersList)
+    mapM_ (trace . show) ts
+    fs <- XS.gets (viewA fehsList)
+    mapM_ (trace . show) fs
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
@@ -102,29 +123,6 @@ testTwoScreen       = fixedLayout
                         [ Rectangle 0 17 1680 536
                         , Rectangle 0 553 1680 480
                         ]
-
-traceXS :: String -> X ()
-traceXS l = do
-    withWindowSet $ \ws -> do
-      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
-        ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled:"
-        trace (show ts)
-      trace "Floating:"
-      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
-      trace (show fs)
-    trace l
-    xs <- XS.gets (viewA xmobarsList)
-    mapM_ (trace . show) xs
-    ts <- XS.gets (viewA trayersList)
-    mapM_ (trace . show) ts
-
--- Union my keys config with current one in ((->) XConfig Layout) applicative
--- functor. Union prefers left argument, when duplicate keys are found, thus
--- my should go first.
-alterKeys :: (XConfig Layout -> M.Map (ButtonMask, KeySym) (X ()))
-             -> XConfig l -> XConfig l
-alterKeys myKs cf@(XConfig {keys = ks}) = cf {keys = M.union <$> myKs <*> ks}
 
 -- FIXME: When i wait for xtrlock process to terminate, i always come back to
 -- old workpace, where i was before pressing lock keys (regardless of
