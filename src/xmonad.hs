@@ -8,17 +8,18 @@ import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
+import XMonad.Util.EZConfig (additionalKeys)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
 import System.Process
 
+import Sgf.Control.Lens
+import Sgf.XMonad.Restartable
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
-import Sgf.Control.Lens
-import Sgf.XMonad.Restartable
 
 main :: IO ()
 main                = do
@@ -26,7 +27,7 @@ main                = do
     xmonad
       . handleFullscreen
       . handleDocks (0, xK_b) myDocks
-      . alterKeys myKeys
+      . (additionalKeys <*> myKeys)
       $ defaultConfig
           {
           -- Workspace "lock" is for xtrlock only and it is inaccessible for
@@ -38,9 +39,6 @@ main                = do
 	  , logHook = traceXS "Huh"
           --, layoutHook = smartBorders $ layoutHook xfceConfig
           }
-  where
-    myDocks :: LayoutClass l Window => [DockConfig l]
-    myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
 
 -- Modify layoutHook to remove borders around floating windows covering whole
 -- screen and around tiled windows in non-ambiguous cases. Also, add event
@@ -52,6 +50,58 @@ handleFullscreen cf = cf
     { layoutHook        = lessBorders OtherIndicated (layoutHook cf)
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
+
+myDocks :: LayoutClass l Window => [DockConfig l]
+myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
+
+xmobarTop :: Xmobar
+xmobarTop           = setA (xmobarPP . maybeL . ppTitleL) t
+                        $ defaultXmobar
+  where
+    t :: String -> String
+    t               = xmobarColor "green" "" . shorten 50
+xmobarBot :: Xmobar
+xmobarBot     = setA xmobarConf (".xmobarrc2")
+                  . setA (xmobarPP . maybeL . ppTitleL) t
+                  . setA xmobarToggle (Just (shiftMask, xK_b))
+                  $ defaultXmobar
+   where
+    t :: String -> String
+    t               = xmobarColor "red" "" . shorten 50
+trayer :: Trayer
+trayer              = defaultTrayer
+
+-- Key for hiding all docks defined by handleDocks, keys for hiding particular
+-- dock, if any, defined in that dock definition (see above).
+myKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
+myKeys XConfig {modMask = m} =
+      [ 
+      --((m .|. shiftMask, xK_p), spawn "exec gmrun")
+        ((m .|. shiftMask, xK_z), lock)
+      , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
+      , ((0,           xK_Print), spawn "scrot")
+      , ((m,           xK_n), stopP xmobarBot)
+      , ((m .|. shiftMask, xK_n), startP xmobarBot)
+      -- For testing two screens.
+      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
+
+      -- Audio keys.
+      , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
+      -- FIXME: This really not exactly what i want. I want, that if sound is
+      -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
+      , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
+          					 ++ "amixer set Master 1311+")
+      , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
+      ]
+
+-- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
+-- resolution is 1680x1050 .
+testTwoScreen :: FixedLayout a
+testTwoScreen       = fixedLayout
+                        [ Rectangle 0 17 1680 536
+                        , Rectangle 0 553 1680 480
+                        ]
 
 traceXS :: String -> X ()
 traceXS l = do
@@ -69,28 +119,6 @@ traceXS l = do
     ts <- XS.gets (viewA trayersList)
     mapM_ (trace . show) ts
 
-xmobarTop :: Xmobar
-xmobarTop           = setA xmobarConf (".xmobarrc")
-                        . setA (xmobarPP . maybeL . ppTitleL) t
-                        . setA xmobarToggle (Just (shiftMask, xK_v))
-                        -- . set xmobarToggle Nothing
-                        $ defaultXmobar
-  where
-    t :: String -> String
-    t               = xmobarColor "green" "" . shorten 50
-
-xmobarBot :: Xmobar
-xmobarBot     = setA xmobarConf (".xmobarrc2")
-                  . setA (xmobarPP . maybeL . ppTitleL) t
-                  . setA xmobarToggle (Just (shiftMask, xK_b))
-                  $ defaultXmobar
-   where
-    t :: String -> String
-    t               = xmobarColor "red" "" . shorten 50
-
-trayer :: Trayer
-trayer              = defaultTrayer
-
 -- Union my keys config with current one in ((->) XConfig Layout) applicative
 -- functor. Union prefers left argument, when duplicate keys are found, thus
 -- my should go first.
@@ -103,7 +131,7 @@ alterKeys myKs cf@(XConfig {keys = ks}) = cf {keys = M.union <$> myKs <*> ks}
 -- workpspace switching code) and all windows are closed on it. Why? But it
 -- does not close windows, if i comment out code, obtaining current
 -- workspace..
-
+-- 
 -- Get current workspace tag, then switch to workspace "lock" (dedicated for
 -- "xtrlock" and inaccessible for workspace switch keys) and lock. After
 -- unlocking return back to workspace, where i was before.
@@ -125,35 +153,4 @@ lock                = do
                         (_, _, _, p) <-
                             createProcess (proc "/usr/bin/xtrlock" [])
                         return p
-
--- My key bindings. They are intended for use with alterKeys only.
-myKeys :: XConfig l -> M.Map (ButtonMask, KeySym) (X ())
-myKeys (XConfig {modMask = m}) =
-    M.fromList
-      [ 
-      --((m .|. shiftMask, xK_p), spawn "exec gmrun")
-        ((m .|. shiftMask, xK_z), lock)
-      , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
-      , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_n), stopP xmobarBot)
-      , ((m .|. shiftMask, xK_n), startP xmobarBot)
-      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
-      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
-
-      -- Audio keys.
-      , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
-      -- FIXME: This really not exactly what i want. I want, that if sound is
-      -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
-      , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
-          					 ++ "amixer set Master 1311+")
-      , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
-      ]
-
--- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
--- resolution is 1680x1050 .
-testTwoScreen :: FixedLayout a
-testTwoScreen       = fixedLayout
-                        [ Rectangle 0 17 1680 536
-                        , Rectangle 0 553 1680 480
-                        ]
 
