@@ -1,3 +1,4 @@
 t.*
 *.o
 *.hi
+nohup.out

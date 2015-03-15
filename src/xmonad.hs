@@ -5,6 +5,9 @@ import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
 import qualified XMonad.Util.ExtensibleState as XS
 import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
+import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
+import XMonad.Layout.LayoutModifier (ModifiedLayout)
+import XMonad.Layout.LayoutScreens
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
@@ -21,13 +24,14 @@ main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
     xmonad
+      . handleFullscreen
       . handleDocks (0, xK_b) myDocks
       . alterKeys myKeys
       $ defaultConfig
-          { layoutHook = layout
+          {
           -- Workspace "lock" is for xtrlock only and it is inaccessible for
           -- workspace switch keys.
-          , workspaces = map show [1..9] ++ ["lock"]
+          workspaces = map show [1..9] ++ ["lock"]
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
@@ -38,6 +42,16 @@ main                = do
     myDocks :: LayoutClass l Window => [DockConfig l]
     myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
 
+-- Modify layoutHook to remove borders around floating windows covering whole
+-- screen and around tiled windows in non-ambiguous cases. Also, add event
+-- hook to detect windows going to fullscreen using _NET_WM_STATE protocol
+-- (EWMH).
+handleFullscreen :: LayoutClass l Window => XConfig l
+                    -> XConfig (ModifiedLayout (ConfigurableBorder Ambiguity) l)
+handleFullscreen cf = cf
+    { layoutHook        = lessBorders OtherIndicated (layoutHook cf)
+    , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
+    }
 
 traceXS :: String -> X ()
 traceXS l = do
@@ -47,7 +61,8 @@ traceXS l = do
         trace "Tiled:"
         trace (show ts)
       trace "Floating:"
-      trace . show $ (M.keys . W.floating $ ws)
+      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
+      trace (show fs)
     trace l
     xs <- XS.gets (viewA xmobarsList)
     mapM_ (trace . show) xs
@@ -75,18 +90,6 @@ xmobarBot     = setA xmobarConf (".xmobarrc2")
 
 trayer :: Trayer
 trayer              = defaultTrayer
--- Layouts definition from defaultConfig with Full layout without borders.
-layout = tiled ||| Mirror tiled ||| noBorders Full
-  where	
-    -- default tiling algorithm partitions the screen into two panes
-    tiled   = Tall nmaster delta ratio
-    -- The default number of windows in the master pane
-    nmaster = 1
-    -- Default proportion of screen occupied by master pane
-    ratio   = 1/2
-    -- Percent of screen to increment by when resizing panes
-    delta   = 3/100
-
 
 -- Union my keys config with current one in ((->) XConfig Layout) applicative
 -- functor. Union prefers left argument, when duplicate keys are found, thus
@@ -134,6 +137,8 @@ myKeys (XConfig {modMask = m}) =
       , ((0,           xK_Print), spawn "scrot")
       , ((m,           xK_n), stopP xmobarBot)
       , ((m .|. shiftMask, xK_n), startP xmobarBot)
+      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
@@ -143,4 +148,12 @@ myKeys (XConfig {modMask = m}) =
           					 ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
       ]
+
+-- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
+-- resolution is 1680x1050 .
+testTwoScreen :: FixedLayout a
+testTwoScreen       = fixedLayout
+                        [ Rectangle 0 17 1680 536
+                        , Rectangle 0 553 1680 480
+                        ]
 
