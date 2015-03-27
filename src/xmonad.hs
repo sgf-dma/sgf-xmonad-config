@@ -39,8 +39,12 @@ main                = do
           {
           -- Workspace "lock" is for xtrlock only and it is inaccessible for
           -- workspace switch keys.
-          workspaces = withScreens 2 (map show [1..9] ++ ["lock"])
           --workspaces = map show [1..9] ++ ["lock"]
+          --workspaces = withScreens 2 (map show [1..5] ++ ["lock"])
+          workspaces = withScreen 0 (map show [1..7])
+                        ++ withScreen 1 (map show [5..9])
+                        ++ withScreen 0 ["lock"]
+          --workspaces = map show [1..8]
           , modMask = mod4Mask
           , focusFollowsMouse = False
           , terminal = "xterm -fg black -bg white"
@@ -65,7 +69,8 @@ currentScreen       = W.screen . W.current
 lastScreen :: WindowSet -> ScreenId
 lastScreen          = maximum . map W.screen . W.screens
 
--- All workspace tags.
+-- All workspace tags. Note, that the order of workspace is not the same as in
+-- XConfig ! It depends on currentls focused workspace.
 workspaceTags :: WindowSet -> [WorkspaceId]
 workspaceTags       = map W.tag . W.workspaces
 
@@ -118,17 +123,22 @@ squashWorkspace' sc vw s = shiftAll' to from s
     -- to first workspace.
     to :: PhysicalWorkspace
     to              = case filter (/= sc) (lookupScreens vw s) of
-      []        -> W.tag . head $ W.workspaces s
+      -- If not found, shift to currently focused workspace, not first one!
+      -- This is the major difference betweeb W.workspaces and workspaces
+      -- record of (XConfig l): W.workspaces always returns current workspace
+      -- first, but XConfig's record returns workspaces in initial definition
+      -- order.
+      []        -> W.tag . head . tail $ W.workspaces s
       (sc2 : _) -> marshall sc2 vw
+
+-- On current screen.
+squashWorkspace :: VirtualWorkspace -> WindowSet -> WindowSet
+squashWorkspace vw  = currentScreen >>= flip squashWorkspace' vw
 
 -- Move out all windows from specified Screen.
 squashScreen' :: ScreenId -> WindowSet -> WindowSet
 squashScreen' sc    = flip (apList . map (squashWorkspace' sc))
                         <*> screenWorkspaces sc
-
--- On current screen.
-squashWorkspace :: VirtualWorkspace -> WindowSet -> WindowSet
-squashWorkspace vw  = currentScreen >>= flip squashWorkspace' vw
 
 -- On last Screen. `rescreen` (from XMonad.Operations), which xmonad runs on
 -- screen configuration change, always renumber screens. So when one monitor
@@ -136,6 +146,30 @@ squashWorkspace vw  = currentScreen >>= flip squashWorkspace' vw
 -- gone.
 squashScreen :: WindowSet -> WindowSet
 squashScreen        = lastScreen >>= squashScreen'
+
+withScreen :: ScreenId -> [VirtualWorkspace] -> [PhysicalWorkspace]
+withScreen sc vws   = [marshall sc pws | pws <- vws]
+
+-- Marshall only tags, which are really defined.
+maybeMarshall :: ScreenId -> VirtualWorkspace -> WindowSet
+                 -> Maybe PhysicalWorkspace
+maybeMarshall sc vws = find (== marshall sc vws) . workspaceTags
+
+onCurrentScreen' :: (PhysicalWorkspace -> WindowSet -> WindowSet)
+                    -> VirtualWorkspace -> WindowSet -> WindowSet
+-- flip (maybe id f) <*> (flip (flip maybeMarshall vws) <*> W.screen . W.current)
+onCurrentScreen' f vws = do
+    sc <- W.screen . W.current
+    mpws <- maybeMarshall sc vws
+    maybe id f mpws
+
+{-
+maybeOnCurrentScreen :: (VirtualWorkspace -> WindowSet -> a)
+                        -> (PhysicalWorkspace -> WindowSet -> a)
+maybeOnCurrentScreen f vws = do -- screen . current >>= f . flip marshall vws
+-}
+
+
 
 {-
 
@@ -231,6 +265,7 @@ traceXS l = do
       trace "Floating:"
       fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
       trace (show fs)
+      trace (show (workspaceTags ws))
     trace l
     xs <- XS.gets (viewA xmobarsList)
     mapM_ (trace . show) xs
@@ -242,7 +277,7 @@ traceXS l = do
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
 myKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
-myKeys XConfig {modMask = m} =
+myKeys cf@(XConfig {modMask = m}) =
       [ 
       --((m .|. shiftMask, xK_p), spawn "exec gmrun")
         ((m .|. shiftMask, xK_z), lock)
@@ -272,14 +307,14 @@ myKeys XConfig {modMask = m} =
 -}
 
       -- IndependentScreens .
-      ++ [((m .|. ms, k), windows $ onCurrentScreen f i)
-                | (i, k) <- zip (map show [1..9]) [xK_1 .. xK_9]
+      ++ [((m .|. ms, k), windows $ onCurrentScreen' f i)
+                | (i, k) <- zip (workspaces' cf) [xK_1 .. xK_9]
                          , (f, ms) <- [(W.greedyView, 0), (W.shift, shiftMask)]]
 
       -- Squash Workspace.
       ++ [(( m .|. shiftMask .|. controlMask, k)
            , windows $ squashWorkspace i)
-                | (i, k) <- zip (map show [1..9]) [xK_1 .. xK_9]]
+                | (i, k) <- zip (workspaces' cf) [xK_1 .. xK_9]]
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
@@ -301,7 +336,8 @@ testTwoScreen       = fixedLayout
 lock :: X ()
 lock                = do
                         --wi <- gets curWsId
-                        windows (W.greedyView "lock")
+                        --windows (W.greedyView "lock")
+                        windows (W.greedyView (marshall 0 "lock"))
                         spawn "xtrlock"
                         --p <- liftIO xtrlock
                         --liftIO (waitForProcess p)
