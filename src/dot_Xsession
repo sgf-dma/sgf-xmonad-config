@@ -17,7 +17,7 @@ else
 fi
 
 # Run commands.
-for cmd in wpa_gui trayer feh; do
+for cmd in wpa_gui; do
     # Result will be empty, if either cmd or $cmd is unset or empty.
     eval "set -- ${cmd:+\${$cmd:+\$$cmd\}}"; 
     if which "${1:-}" >/dev/null ; then
