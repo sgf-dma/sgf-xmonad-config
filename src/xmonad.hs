@@ -27,6 +27,7 @@ import Data.List
 import Data.Monoid
 import qualified Data.Foldable as F
 import XMonad.Layout.IndependentScreens
+import Control.Monad.Reader
 
 main :: IO ()
 main                = do
@@ -69,8 +70,10 @@ currentScreen       = W.screen . W.current
 lastScreen :: WindowSet -> ScreenId
 lastScreen          = maximum . map W.screen . W.screens
 
--- All workspace tags. Note, that the order of workspace is not the same as in
--- XConfig ! It depends on currentls focused workspace.
+-- All workspace tags in StackSet order (first current, then visible, then
+-- hidden). Note, that this order differs from workspace order in (XConfig l)
+-- and order of hidden workspaces depends on workspace switches actually
+-- performed so far.
 workspaceTags :: WindowSet -> [WorkspaceId]
 workspaceTags       = map W.tag . W.workspaces
 
@@ -82,7 +85,6 @@ tagWindows i s      = fromMaybe [] $ do
 
 -- Moves all specified windows to another workspace.
 shiftAllWins :: WorkspaceId -> [Window] -> WindowSet -> WindowSet
---shiftAllWins to     = appEndo . F.foldMap (Endo . W.shiftWin to)
 shiftAllWins to     = apList . map (W.shiftWin to)
 
 -- Move all windows from one workspace to another.
@@ -95,45 +97,89 @@ shiftAll to         = flip (shiftAll' to) <*> W.currentTag
 
 
 -- IndependentScreens operations.
--- Number of screens used by IndependentScreens (starting from 1).
-allScreens :: WindowSet -> Int
-allScreens          = length . nub . map unmarshallS . workspaceTags
+-- Screens used by IndependentScreens. To make result independent from current
+-- workspace distribution in StackSet (current, visible, hidden), i sort
+-- output.
+allScreens :: WindowSet -> [ScreenId]
+allScreens          = sort . nub . map unmarshallS . workspaceTags
 
--- All Screens, which have virtual workspace.
-lookupScreens :: VirtualWorkspace -> WindowSet -> [ScreenId]
-lookupScreens vw    = map unmarshallS . filter hasWorkspace . workspaceTags
+-- All Screens, which have virtual workspace. To make result independent from
+-- current workspace distribution in StackSet (current, visible, hidden), i
+-- sort output.
+workspaceScreens :: VirtualWorkspace -> WindowSet -> [ScreenId]
+workspaceScreens vw = sort . map unmarshallS
+                        . filter hasWorkspace . workspaceTags
   where
     hasWorkspace :: PhysicalWorkspace -> Bool
     hasWorkspace pw = unmarshallW pw == vw
 
--- All virtual workspaces, which Screen has.
+-- All virtual workspaces, which Screen has. To make result independent from
+-- current workspace distribution in StackSet (current, visible, hidden), i
+-- sort output.
 screenWorkspaces :: ScreenId -> WindowSet -> [VirtualWorkspace]
-screenWorkspaces sc = map unmarshallW . filter onScreen . workspaceTags
+screenWorkspaces sc = sort . map unmarshallW
+                        . filter onScreen . workspaceTags
   where
     onScreen :: PhysicalWorkspace -> Bool
     onScreen pw     = unmarshallS pw == sc
 
 -- Move out all windows from virtual workspace on specified Screen.
 squashWorkspace' :: ScreenId -> VirtualWorkspace -> WindowSet -> WindowSet
-squashWorkspace' sc vw s = shiftAll' to from s
+squashWorkspace' sc vw s = maybe s ($ s) $ do
+    from <- fromWorkspace s
+    to   <- toWorkspace s
+    return (shiftAll' to from)
   where
-    from :: PhysicalWorkspace
-    from            = marshall sc vw
-    -- Move to workspace with matched virtual name on other Screen, if any, or
-    -- to first workspace.
-    to :: PhysicalWorkspace
-    to              = case filter (/= sc) (lookupScreens vw s) of
-      -- If not found, shift to currently focused workspace, not first one!
-      -- This is the major difference betweeb W.workspaces and workspaces
-      -- record of (XConfig l): W.workspaces always returns current workspace
-      -- first, but XConfig's record returns workspaces in initial definition
-      -- order.
-      []        -> W.tag . head . tail $ W.workspaces s
+    fromWorkspace :: WindowSet -> Maybe PhysicalWorkspace
+    fromWorkspace   = maybeMarshall sc vw
+    -- Lookup for workspace with matched virtual name on other Screen. If no
+    -- Screens found, though, shift to visible workspace on (first) other
+    -- Screen or to first hidden workspace.
+    toWorkspace :: WindowSet -> Maybe PhysicalWorkspace
+    toWorkspace s'   = do
+      sc2 <- listToMaybe
+        -- FIXME: I should use W.screens - i.e. actual screens, but not
+        -- allScreens here. Like
+        -- \vw -> map W.screen <$> W.screens >>= filterM (\x -> elem x <$>  workspaceScreens vw)  -- this all workspace Screens, which really present. Otherwise i should fallback as usual.
+        $ filter (/= sc) (workspaceScreens vw s' ++ allScreens s')
+      getFirst
+        $ First (maybeMarshall sc2 vw s')
+        `mappend` First (W.lookupWorkspace sc2 s')
+    toWorkspace2 :: WindowSet -> PhysicalWorkspace
+    toWorkspace2 s   = case filter (/= sc) (workspaceScreens vw s) of
+      []        -> head . tail $ workspaceTags s
+      -- filter (sc /=) <$> allScreens and then use screenWorkspace from
+      -- XMonad.Operations .
       (sc2 : _) -> marshall sc2 vw
+    toWorkspace' :: WindowSet -> Maybe PhysicalWorkspace
+    toWorkspace' s   = case listToMaybe (filter (/= sc) (workspaceScreens vw s)) of
+        Just sc2 -> maybeMarshall sc2 vw s
+        Nothing  -> case listToMaybe (filter (/= sc) (allScreens s)) of
+          Just sc2 -> W.lookupWorkspace sc2 s
+          Nothing  -> Nothing
+    toWorkspace'' s   =
+      case listToMaybe (filter (/= sc) (workspaceScreens vw s ++ allScreens s)) of
+        Just sc2 -> case maybeMarshall sc2 vw s of
+          Just pw  -> Just pw
+          Nothing  -> W.lookupWorkspace sc2 s
+        Nothing  -> Nothing
+    toWorkspace'''' :: WindowSet -> Maybe PhysicalWorkspace
+    toWorkspace''''  = do
+      ws <- workspaceScreens vw
+      as <- allScreens
+      let msc2 = listToMaybe (filter (/= sc) (ws ++ as))
+      flip (maybe (return Nothing)) msc2 $ \sc2 -> do
+        pw1 <- maybeMarshall sc2 vw
+        pw2 <- W.lookupWorkspace sc2
+        return (getFirst (First pw1 `mappend` First pw2))
 
--- On current screen.
-squashWorkspace :: VirtualWorkspace -> WindowSet -> WindowSet
-squashWorkspace vw  = currentScreen >>= flip squashWorkspace' vw
+
+-- Squash workspace of current screen.
+squashWorkspace :: WindowSet -> WindowSet
+squashWorkspace     = do 
+    sc <- currentScreen
+    vw <- W.currentTag
+    squashWorkspace' sc (unmarshallW vw)
 
 -- Move out all windows from specified Screen.
 squashScreen' :: ScreenId -> WindowSet -> WindowSet
@@ -142,33 +188,27 @@ squashScreen' sc    = flip (apList . map (squashWorkspace' sc))
 
 -- On last Screen. `rescreen` (from XMonad.Operations), which xmonad runs on
 -- screen configuration change, always renumber screens. So when one monitor
--- had been unplugged, no matter which number it have - always the last Screen
+-- had been unplugged, no matter which number it have, always the last Screen
 -- gone.
 squashScreen :: WindowSet -> WindowSet
 squashScreen        = lastScreen >>= squashScreen'
 
+
+-- Support for non-paired virtual workspaces.
 withScreen :: ScreenId -> [VirtualWorkspace] -> [PhysicalWorkspace]
 withScreen sc vws   = [marshall sc pws | pws <- vws]
 
--- Marshall only tags, which are really defined.
+-- Marshall only to tags (physical workspaces), which are really defined.
 maybeMarshall :: ScreenId -> VirtualWorkspace -> WindowSet
                  -> Maybe PhysicalWorkspace
 maybeMarshall sc vws = find (== marshall sc vws) . workspaceTags
 
 onCurrentScreen' :: (PhysicalWorkspace -> WindowSet -> WindowSet)
                     -> VirtualWorkspace -> WindowSet -> WindowSet
--- flip (maybe id f) <*> (flip (flip maybeMarshall vws) <*> W.screen . W.current)
 onCurrentScreen' f vws = do
-    sc <- W.screen . W.current
+    sc <- currentScreen
     mpws <- maybeMarshall sc vws
     maybe id f mpws
-
-{-
-maybeOnCurrentScreen :: (VirtualWorkspace -> WindowSet -> a)
-                        -> (PhysicalWorkspace -> WindowSet -> a)
-maybeOnCurrentScreen f vws = do -- screen . current >>= f . flip marshall vws
--}
-
 
 
 {-
@@ -193,7 +233,7 @@ onScreenChange (ConfigureEvent {ev_window = w}) = do
     whenX (isRoot w) $ do
       c <- countScreens
       withWindowSet $ \s -> do
-        let n = allScreens s
+        let n = length (allScreens s)
         mapM_ (windows . squashScreen' . S) [c..n]
     return (All True)
 onScreenChange   _  = return (All True)
@@ -201,7 +241,7 @@ onScreenChange   _  = return (All True)
 
 {-
     in  if null xs 
-                          ss = lookupScreens vws s
+                          ss = workspaceScreens vws s
                           rs = filter n ss
                       in  map (shiftAll marshall n) vws
 
@@ -288,14 +328,16 @@ myKeys cf@(XConfig {modMask = m}) =
       -- For testing two screens.
       , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
       , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
-      , ((m .|. shiftMask , xK_u), windows $ squashScreen)
+      , ((m, xK_s), windows squashWorkspace)
+      , ((m .|. shiftMask, xK_s), windows (currentScreen >>= squashScreen'))
+      , ((m .|. shiftMask, xK_u), windows squashScreen)
 
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
       -- FIXME: This really not exactly what i want. I want, that if sound is
       -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
       , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
-          					 ++ "amixer set Master 1311+")
+                                                 ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
       ]
 
@@ -311,10 +353,12 @@ myKeys cf@(XConfig {modMask = m}) =
                 | (i, k) <- zip (workspaces' cf) [xK_1 .. xK_9]
                          , (f, ms) <- [(W.greedyView, 0), (W.shift, shiftMask)]]
 
+{-
       -- Squash Workspace.
       ++ [(( m .|. shiftMask .|. controlMask, k)
            , windows $ squashWorkspace i)
                 | (i, k) <- zip (workspaces' cf) [xK_1 .. xK_9]]
+-}
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
