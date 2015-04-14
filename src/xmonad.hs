@@ -21,6 +21,7 @@ import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
 import Sgf.XMonad.Session
+import Sgf.XMonad.Util.EZConfig
 
 main :: IO ()
 main                = do
@@ -28,6 +29,7 @@ main                = do
     xmonad
       . handleFullscreen
       . handleDocks (0, xK_b) myDocks
+      . mapKeys (addModMask (controlMask .|.))
       . (additionalKeys <*> myKeys)
       $ defaultConfig
           {
