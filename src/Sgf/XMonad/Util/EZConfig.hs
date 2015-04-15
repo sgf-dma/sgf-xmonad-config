@@ -5,8 +5,10 @@ module Sgf.XMonad.Util.EZConfig
     )
   where
 
-import XMonad
+import Control.Arrow
 import qualified Data.Map as M
+
+import XMonad
 
 -- Map function over keys's Map .
 mapKeys :: (M.Map (ButtonMask, KeySym) (X ()) -> M.Map (ButtonMask, KeySym) (X ()))
@@ -18,5 +20,5 @@ mapKeys f conf      = conf {keys = fmap f (keys conf)}
 addModMask :: (ButtonMask -> ButtonMask)
                      -> M.Map (ButtonMask, KeySym) (X ())
                      -> M.Map (ButtonMask, KeySym) (X ())
-addModMask f xs     = xs `M.union` M.mapKeys (\(m, t) -> (f m, t)) xs
+addModMask f xs     = xs `M.union` M.mapKeys (first f) xs
 
