@@ -1,10 +1,10 @@
 #!/bin/sh
 
-set -euf
-
 if [ -f "$HOME/.profile" ]; then
     . "$HOME/.profile"
 fi
+
+set -euf
 
 # Commands. To add new command define variable here, and add variable name to
 # cycle below. Command will be run through `eval`.
@@ -29,5 +29,12 @@ for cmd in wpa_gui; do
     fi
 done
 
+user_session_lib_dir="$HOME/.Xsession.d"
+
+. "$user_session_lib_dir/xkb_ctrl_esc_to_super.sh"
+
+xkb_ctrl_esc_to_super
+
+echo "Starting xmonad.."
 exec ~/.xmonad/xmonad-i386-linux
 
