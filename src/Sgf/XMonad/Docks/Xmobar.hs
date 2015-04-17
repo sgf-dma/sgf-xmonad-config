@@ -14,7 +14,9 @@ module Sgf.XMonad.Docks.Xmobar
 import Prelude hiding (catch)
 import Control.Monad.State
 import Control.Exception
-import System.IO
+import System.IO (hPutStrLn)
+import System.FilePath
+import System.Directory (getHomeDirectory)
 import System.Posix.Types (ProcessID)
 
 import XMonad
@@ -110,7 +112,8 @@ instance ProcessClass Xmobar where
     pidL            = xmobarPid
 instance RestartClass Xmobar where
     runP x          = userCodeDef x $ do
-        doesConfExist x
+        xcf <- absXmobarConf
+        liftIO $ (doesFileExist' xcf) `catch` (throw . XmobarConfException)
         case (viewA xmobarPP x) of
           Just _ -> do
             (h, p) <- spawnPipe' "xmobar" [xcf]
@@ -118,10 +121,17 @@ instance RestartClass Xmobar where
               . setA xmobarPid (Just p)
               . setA (xmobarPP . maybeL . ppOutputL) (hPutStrLn h)
               $ x
-          Nothing  -> defaultRunP "xmobar" [xcf] x
+          Nothing  -> do
+            xcf <- absXmobarConf
+            defaultRunP "xmobar" [xcf] x
       where
-        xcf :: FilePath
-        xcf         = viewA xmobarConf x
+        -- If xmobarConf is relative, take it from home directory, not from
+        -- current directory.
+        absXmobarConf :: MonadIO m => m FilePath
+        absXmobarConf   = liftIO $ do
+          d <- getHomeDirectory
+          let cf = viewA xmobarConf x
+          if (isRelative cf) then return (d </> cf) else return cf
     -- I need to reset pipe (to ignore output), because though process got
     -- killed, xmobar value still live in Extensible state and dockLog does
     -- not check process existence - just logs according to PP, if any.
@@ -135,10 +145,6 @@ data XmobarException    = XmobarConfException FileException
 instance Show XmobarException where
     show (XmobarConfException x) = "Xmobar config: " ++ show x
 instance Exception XmobarException where
-
-doesConfExist :: MonadIO m => Xmobar -> m ()
-doesConfExist x     = liftIO $ doesFileExist' (viewA xmobarConf x)
-                        `catch` (throw . XmobarConfException)
 
 -- Lens for obtaining list of all Xmobars stored in extensible state.
 xmobarsList :: LensA (ListP Xmobar) [Xmobar]
