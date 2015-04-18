@@ -21,27 +21,26 @@ import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
 import Sgf.XMonad.Session
-import Sgf.XMonad.Util.EZConfig
+import Sgf.XMonad.VNC
 
 main :: IO ()
 main                = do
     -- FIXME: Spawn process directly, not through shell.
-    xmonad
-      . handleFullscreen
-      . handleDocks (0, xK_b) myDocks
-      . mapKeys (addModMask (controlMask .|.))
-      . (additionalKeys <*> myKeys)
-      $ defaultConfig
-          {
-          -- Workspace "lock" is for xtrlock only and it is inaccessible for
-          -- workspace switch keys.
-          workspaces = map show [1..9] ++ ["lock"]
-          , modMask = mod4Mask
-          , focusFollowsMouse = False
-          , terminal = "xterm -fg black -bg white"
-          , logHook = traceXS "traceXS"
-          , startupHook = restartP' feh >> return ()
-          }
+    let xcf = handleFullscreen
+                . handleDocks (0, xK_b) myDocks
+                . (additionalKeys <*> myKeys)
+                $ defaultConfig
+                    {
+                    -- Workspace "lock" is for xtrlock only and it is
+                    -- inaccessible for workspace switch keys.
+                    workspaces = map show [1..9] ++ ["lock"]
+                    , modMask = mod4Mask
+                    , focusFollowsMouse = False
+                    , terminal = "xterm -fg black -bg white"
+                    , logHook = traceXS "traceXS"
+                    , startupHook = restartP' feh >> return ()
+                    }
+    handleVnc xcf >>= xmonad
 
 -- Modify layoutHook to remove borders around floating windows covering whole
 -- screen and around tiled windows in non-ambiguous cases. Also, add event
