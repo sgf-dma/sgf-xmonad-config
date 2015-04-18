@@ -122,7 +122,6 @@ instance RestartClass Xmobar where
               . setA (xmobarPP . maybeL . ppOutputL) (hPutStrLn h)
               $ x
           Nothing  -> do
-            xcf <- absXmobarConf
             defaultRunP "xmobar" [xcf] x
       where
         -- If xmobarConf is relative, take it from home directory, not from
