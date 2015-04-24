@@ -11,8 +11,12 @@ module Sgf.XMonad.Docks.Xmobar
     )
   where
 
+import Prelude hiding (catch)
 import Control.Monad.State
-import System.IO
+import Control.Exception
+import System.IO (hPutStrLn)
+import System.FilePath
+import System.Directory (getHomeDirectory)
 import System.Posix.Types (ProcessID)
 
 import XMonad
@@ -20,6 +24,7 @@ import qualified XMonad.Hooks.DynamicLog as L
 
 import Sgf.Data.List
 import Sgf.Control.Lens
+import Sgf.Control.Exception
 import Sgf.XMonad.Util.Run (spawnPipe')
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Docks
@@ -106,14 +111,26 @@ instance Eq Xmobar where
 instance ProcessClass Xmobar where
     pidL            = xmobarPid
 instance RestartClass Xmobar where
-    runP x          = case (viewA xmobarPP x) of
-        Just _ -> do
-          (h, p) <- spawnPipe' "xmobar" [viewA xmobarConf x]
-          return
-            . setA xmobarPid (Just p)
-            . setA (xmobarPP . maybeL . ppOutputL) (hPutStrLn h)
-            $ x
-        Nothing  -> defaultRunP "xmobar" [viewA xmobarConf x] x
+    runP x          = userCodeDef x $ do
+        xcf <- absXmobarConf
+        liftIO $ (doesFileExist' xcf) `catch` (throw . XmobarConfException)
+        case (viewA xmobarPP x) of
+          Just _ -> do
+            (h, p) <- spawnPipe' "xmobar" [xcf]
+            return
+              . setA xmobarPid (Just p)
+              . setA (xmobarPP . maybeL . ppOutputL) (hPutStrLn h)
+              $ x
+          Nothing  -> do
+            defaultRunP "xmobar" [xcf] x
+      where
+        -- If xmobarConf is relative, take it from home directory, not from
+        -- current directory.
+        absXmobarConf :: MonadIO m => m FilePath
+        absXmobarConf   = liftIO $ do
+          d <- getHomeDirectory
+          let cf = viewA xmobarConf x
+          if (isRelative cf) then return (d </> cf) else return cf
     -- I need to reset pipe (to ignore output), because though process got
     -- killed, xmobar value still live in Extensible state and dockLog does
     -- not check process existence - just logs according to PP, if any.
@@ -121,6 +138,12 @@ instance RestartClass Xmobar where
 instance DockClass Xmobar where
     dockToggleKey   = viewA xmobarToggle
     ppL             = xmobarPP
+
+data XmobarException    = XmobarConfException FileException
+  deriving (Typeable)
+instance Show XmobarException where
+    show (XmobarConfException x) = "Xmobar config: " ++ show x
+instance Exception XmobarException where
 
 -- Lens for obtaining list of all Xmobars stored in extensible state.
 xmobarsList :: LensA (ListP Xmobar) [Xmobar]

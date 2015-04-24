@@ -2,3 +2,4 @@ t.*
 *.o
 *.hi
 nohup.out
+xmonad.errors
