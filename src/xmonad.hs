@@ -22,9 +22,13 @@ import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.Docks.Trayer
 import Sgf.XMonad.Session
 import Sgf.XMonad.VNC
+import Sgf.XMonad.Util.EntryHelper
 
 main :: IO ()
-main                = do
+main                = withHelper main_0
+
+main_0 :: IO ()
+main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
                 . handleDocks (0, xK_b) myDocks
