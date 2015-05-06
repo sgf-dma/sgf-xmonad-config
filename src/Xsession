@@ -22,5 +22,5 @@ run_cmd wpa_gui
 xkb_ctrl_esc_to_super
 
 echo "Starting xmonad.."
-exec ~/.xmonad/xmonad-i386-linux
+exec ~/bin/xmonad
 
