@@ -21,30 +21,6 @@ category:            Graphics
 build-type:          Simple
 cabal-version:       >= 1.8
 
-library
-    exposed-modules:    Sgf.XMonad.Docks
-                        Sgf.XMonad.Restartable
-                        Sgf.XMonad.Docks.Xmobar
-                        Sgf.XMonad.Docks.Trayer
-    other-modules:      Sgf.Data.List
-                        Sgf.Control.Lens
-                        Sgf.Control.Exception
-                        Sgf.XMonad.Session
-                        Sgf.XMonad.Util.Run
-                        Sgf.XMonad.Util.EntryHelper
-
-    build-depends:      base                == 4.5.*
-                        , mtl               == 2.1.*
-                        , transformers      == 0.3.*
-                        , filepath          == 1.3.*
-                        , directory         == 1.1.*
-                        , unix              == 2.5.*
-                        , xmonad            == 0.10.*
-                        , xmonad-contrib    == 0.10.*
-                        , xmonad-entryhelper    == 0.1.*
-    hs-source-dirs:     src
-    ghc-options:        -Wall
-
 executable xmonad
     main-is:            xmonad.hs
     build-depends:      base                    == 4.5.*
@@ -59,8 +35,7 @@ executable xmonad
                         , xmonad                == 0.10.*
                         , xmonad-contrib        == 0.10.*
                         , xmonad-entryhelper    == 0.1.*
-                        , sgf-xmonad            == 0.1.*
-
+                        , sgf-xmonad-modules    == 0.1.*
     hs-source-dirs:     src
     ghc-options:        -Wall
   
