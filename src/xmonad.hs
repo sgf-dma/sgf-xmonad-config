@@ -1,9 +1,10 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
-import qualified XMonad.Util.ExtensibleState as XS
 import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
@@ -15,12 +16,14 @@ import qualified Data.Map as M
 import Control.Applicative
 import System.Process
 
+import System.FilePath
+import System.Directory
+import Codec.Binary.UTF8.String (encodeString) 
+
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
-import Sgf.XMonad.Docks.Trayer
-import Sgf.XMonad.Session
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
 
@@ -41,8 +44,8 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    , logHook = traceXS "traceXS"
-                    , startupHook = restartP' feh >> return ()
+                    , logHook = myTrace
+                    , startupHook = myPrograms
                     }
     handleVnc xcf >>= xmonad
 
@@ -57,45 +60,88 @@ handleFullscreen cf = cf
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
 
+-- Docks and programs {{{
 myDocks :: LayoutClass l Window => [DockConfig l]
-myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
+myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
-xmobarTop :: Xmobar
-xmobarTop           = setA (xmobarPP . maybeL . ppTitleL) t
+-- Note, that because i redefine PP, Xmobar implementation assumes, that
+-- StdinReader is used in .xmobarrc, and opens pipe to xmobar. Thus, if
+-- StdinReader does not actually used in template in .xmobarrc, xmonad will
+-- freeze, when pipe fills up. See
+-- https://wiki.haskell.org/Xmonad/Frequently_asked_questions#XMonad_is_frozen.21
+-- .
+-- Main xmobar, which does not have hiding (Strut toggle) key.
+xmobar :: Xmobar
+xmobar              = setA (xmobarPP . maybeL . ppTitleL) t
                         $ defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
-xmobarBot :: Xmobar
-xmobarBot     = setA xmobarConf (".xmobarrc2")
-                  . setA (xmobarPP . maybeL . ppTitleL) t
-                  . setA xmobarToggle (Just (shiftMask, xK_b))
-                  $ defaultXmobar
+-- Alternative xmobar, which has hiding (Strut toggle) key.
+xmobarAlt :: Xmobar
+xmobarAlt           = setA xmobarConf (".xmobarrc2")
+                        . setA (xmobarPP . maybeL . ppTitleL) t
+                        . setA xmobarToggle (Just (shiftMask, xK_b))
+                        $ defaultXmobar
    where
     t :: String -> String
     t               = xmobarColor "red" "" . shorten 50
-trayer :: Trayer
-trayer              = defaultTrayer
-feh :: Feh
-feh                 = defaultFeh
 
-traceXS :: String -> X ()
-traceXS l = do
+newtype Trayer      = Trayer Dock
+  deriving (Eq, Show, Read, Typeable, ProcessClass, RestartClass, DockClass)
+trayer :: Trayer
+trayer              = Trayer $ setA dockBin "trayer"
+                        . setA dockArgs 
+                            [ "--edge", "top", "--align", "right"
+                            , "--SetDockType", "true"
+                            , "--SetPartialStrut", "true"
+                            , "--expand", "true", "--width", "10"
+                            , "--transparent", "true" , "--tint", "0x191970"
+                            , "--height", "12"
+                            ]
+                        $ defaultDock
+
+
+myPrograms :: X ()
+myPrograms          = do
+    _ <- restartP' feh
+    return ()
+
+-- Use `xsetroot -grey`, if no .fehbg found.
+newtype Feh         = Feh Program
+  deriving (Eq, Show, Read, Typeable, ProcessClass)
+instance RestartClass Feh where
+    runP (Feh x)    = do
+        cmd <- liftIO $ do
+          h <- getHomeDirectory
+          let f = h </> ".fehbg"
+          b <- doesFileExist f
+          if b
+            then readFile f
+            else return "xsetroot -grey"
+        Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
+feh :: Feh
+feh                 = Feh   $ setA progBin "/bin/sh"
+                            . setA progArgs ["-c", ""]
+                            $ defaultProgram
+
+-- END docks and programs }}}
+
+-- Print some information.
+myTrace :: X ()
+myTrace             = do
     withWindowSet $ \ws -> do
       whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
         ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled:"
+        trace "Tiled windows:"
         trace (show ts)
-      trace "Floating:"
+      trace "Floating windows:"
       fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
       trace (show fs)
-    trace l
-    xs <- XS.gets (viewA xmobarsList)
-    mapM_ (trace . show) xs
-    ts <- XS.gets (viewA trayersList)
-    mapM_ (trace . show) ts
-    fs <- XS.gets (viewA fehsList)
-    mapM_ (trace . show) fs
+    trace "Tracked programs:"
+    traceP xmobar
+    traceP trayer
+    traceP feh
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
@@ -106,8 +152,8 @@ myKeys XConfig {modMask = m} =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_n), stopP xmobarBot)
-      , ((m .|. shiftMask, xK_n), startP xmobarBot)
+      , ((m,           xK_n), stopP xmobarAlt)
+      , ((m .|. shiftMask, xK_n), startP xmobarAlt)
       -- For testing two screens.
       , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
       , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
@@ -117,7 +163,7 @@ myKeys XConfig {modMask = m} =
       -- FIXME: This really not exactly what i want. I want, that if sound is
       -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
       , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
-          					 ++ "amixer set Master 1311+")
+                                                 ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
       ]
 
