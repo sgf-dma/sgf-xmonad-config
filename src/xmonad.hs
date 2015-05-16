@@ -45,7 +45,7 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    , logHook = traceXS "traceXS"
+                    , logHook = traceWindows "Windows:" >> traceXS "XS:"
                     , startupHook = restartP' feh >> return ()
                     }
     handleVnc xcf >>= xmonad
@@ -118,17 +118,9 @@ feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
 
--- Print all tracked in Extensible state Xmobar, Trayer and Feh processes.
+-- Print all Xmobar, Trayer and Feh processes tracked in Extensible state.
 traceXS :: String -> X ()
-traceXS l = do
-    withWindowSet $ \ws -> do
-      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
-        ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled:"
-        trace (show ts)
-      trace "Floating:"
-      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
-      trace (show fs)
+traceXS l           = do
     trace l
     xs <- XS.gets (viewA processList `asTypeOf` const [xmobarBot])
     mapM_ (trace . show) xs
@@ -138,6 +130,18 @@ traceXS l = do
     mapM_ (trace . show) fs
 
 -- END docks and programs }}}
+
+traceWindows :: String -> X ()
+traceWindows l      = do
+    trace l
+    withWindowSet $ \ws -> do
+      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
+        ts <- mapM (runQuery title) (W.integrate s)
+        trace "Tiled:"
+        trace (show ts)
+      trace "Floating:"
+      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
+      trace (show fs)
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
