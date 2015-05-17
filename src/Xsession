@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -euf
+
+user_session_lib_dir="$HOME/.Xsession.d"
+
+. "$user_session_lib_dir/xkb_ctrl_esc_to_super.sh"
+. "$user_session_lib_dir/run_cmd.sh"
+
+# Commands to run in X session. To add new command define variable here, and
+# pass variable name to run_cmd() function below. Command will be run through
+# `eval`.
+wpa_gui='/usr/sbin/wpa_gui'
+trayer='/usr/bin/trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand true --width 10 --transparent true --tint 0x191970 --height 12'
+if [ -r ~/.fehbg ]; then
+    feh="$(cat ~/.fehbg)"
+else
+    feh='xsetroot -grey'
+fi
+run_cmd wpa_gui
+
+xkb_ctrl_esc_to_super
+
+echo "Starting xmonad.."
+exec ~/bin/xmonad
+

@@ -1,0 +1,3 @@
+xkb_symbols {
+    key <ESC> { type="PC_CONTROL_LEVEL2", [ Escape, Super_L ] };
+};

@@ -1,68 +1,182 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 import XMonad
-import XMonad.Hooks.DynamicLog
-import XMonad.Hooks.ManageDocks
 import XMonad.Layout.NoBorders
-import XMonad.Util.Run (spawnPipe)
 import qualified XMonad.StackSet as W
+import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
+import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
+import XMonad.Layout.LayoutModifier (ModifiedLayout)
+import XMonad.Layout.LayoutScreens
+import XMonad.Util.EZConfig (additionalKeys)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Control.Applicative
-import System.IO (hPutStrLn)
-import System.Directory (getHomeDirectory)
-import System.FilePath ((</>))
 import System.Process
 
+import System.FilePath
+import System.Directory
+import Codec.Binary.UTF8.String (encodeString) 
+
+import Sgf.Control.Lens
+import Sgf.XMonad.Restartable
+import Sgf.XMonad.Docks
+import Sgf.XMonad.Docks.Xmobar
+import Sgf.XMonad.VNC
+import Sgf.XMonad.Util.EntryHelper
+
 main :: IO ()
-main                = do
+main                = withHelper main_0
+
+main_0 :: IO ()
+main_0              = do
     -- FIXME: Spawn process directly, not through shell.
-    xmPipe <- spawnPipe ("xmobar ~/.xmobarrc")
-    xmonad
-      . alterKeys myKeys
-      $ defaultConfig
-          { manageHook = manageDocks <+> manageHook defaultConfig
-          , layoutHook = avoidStruts $ layout
-          , logHook    = dynamicLogWithPP xmobarPP
-                           { ppOutput = hPutStrLn xmPipe
-                           , ppTitle  = xmobarColor "green" ""
-                                          . shorten 50
-                           }
-          -- Workspace "lock" is for xtrlock only and it is inaccessible for
-          -- workspace switch keys.
-          , workspaces = map show [1..9] ++ ["lock"]
-          , modMask = mod4Mask
-          , focusFollowsMouse = False
-          , terminal = "xterm -fg black -bg white"
-          --, layoutHook = smartBorders $ layoutHook xfceConfig
-          }
+    let xcf = handleFullscreen
+                . handleDocks (0, xK_b) myDocks
+                . (additionalKeys <*> myKeys)
+                $ defaultConfig
+                    {
+                    -- Workspace "lock" is for xtrlock only and it is
+                    -- inaccessible for workspace switch keys.
+                    workspaces = map show [1..9] ++ ["lock"]
+                    , modMask = mod4Mask
+                    , focusFollowsMouse = False
+                    , terminal = "xterm -fg black -bg white"
+                    , logHook = traceXS "traceXS"
+                    , startupHook = restartP' feh >> return ()
+                    }
+    handleVnc xcf >>= xmonad
 
--- Layouts definition from defaultConfig with Full layout without borders.
-layout = tiled ||| Mirror tiled ||| noBorders Full
-  where	
-    -- default tiling algorithm partitions the screen into two panes
-    tiled   = Tall nmaster delta ratio
-    -- The default number of windows in the master pane
-    nmaster = 1
-    -- Default proportion of screen occupied by master pane
-    ratio   = 1/2
-    -- Percent of screen to increment by when resizing panes
-    delta   = 3/100
+-- Modify layoutHook to remove borders around floating windows covering whole
+-- screen and around tiled windows in non-ambiguous cases. Also, add event
+-- hook to detect windows going to fullscreen using _NET_WM_STATE protocol
+-- (EWMH).
+handleFullscreen :: LayoutClass l Window => XConfig l
+                    -> XConfig (ModifiedLayout (ConfigurableBorder Ambiguity) l)
+handleFullscreen cf = cf
+    { layoutHook        = lessBorders OtherIndicated (layoutHook cf)
+    , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
+    }
 
+-- Docks and programs {{{
+myDocks :: LayoutClass l Window => [DockConfig l]
+myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
 
--- Union my keys config with current one in ((->) XConfig Layout) applicative
--- functor. Union prefers left argument, when duplicate keys are found, thus
--- my should go first.
-alterKeys :: (XConfig Layout -> M.Map (ButtonMask, KeySym) (X ()))
-             -> XConfig l -> XConfig l
-alterKeys myKs cf@(XConfig {keys = ks}) = cf {keys = M.union <$> myKs <*> ks}
+-- Note, that because i redefine PP, Xmobar implementation assumes, that
+-- StdinReader is used in .xmobarrc, and opens pipe to xmobar. Thus, if
+-- StdinReader does not actually used in template in .xmobarrc, xmonad will
+-- freeze, when pipe fills up. See
+-- https://wiki.haskell.org/Xmonad/Frequently_asked_questions#XMonad_is_frozen.21
+-- .
+xmobarTop :: Xmobar
+xmobarTop           = setA (xmobarPP . maybeL . ppTitleL) t
+                        $ defaultXmobar
+  where
+    t :: String -> String
+    t               = xmobarColor "green" "" . shorten 50
+xmobarBot :: Xmobar
+xmobarBot     = setA xmobarConf (".xmobarrc2")
+                  . setA (xmobarPP . maybeL . ppTitleL) t
+                  . setA xmobarToggle (Just (shiftMask, xK_b))
+                  $ defaultXmobar
+   where
+    t :: String -> String
+    t               = xmobarColor "red" "" . shorten 50
+
+newtype Trayer      = Trayer Dock
+  deriving (Eq, Show, Read, Typeable, ProcessClass, RestartClass, DockClass)
+trayer :: Trayer
+trayer              = Trayer $ setA dockBin "trayer"
+                        . setA dockArgs 
+                            [ "--edge", "top", "--align", "right"
+                            , "--SetDockType", "true"
+                            , "--SetPartialStrut", "true"
+                            , "--expand", "true", "--width", "10"
+                            , "--transparent", "true" , "--tint", "0x191970"
+                            , "--height", "12"
+                            ]
+                        $ defaultDock
+
+-- Use `xsetroot -grey`, if no .fehbg found.
+newtype Feh         = Feh Program
+  deriving (Eq, Show, Read, Typeable, ProcessClass)
+instance RestartClass Feh where
+    runP (Feh x)    = do
+        cmd <- liftIO $ do
+          h <- getHomeDirectory
+          let f = h </> ".fehbg"
+          b <- doesFileExist f
+          if b
+            then readFile f
+            else return "xsetroot -grey"
+        Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
+feh :: Feh
+feh                 = Feh   $ setA progBin "/bin/sh"
+                            . setA progArgs ["-c", ""]
+                            $ defaultProgram
+
+-- Print all tracked in Extensible state Xmobar, Trayer and Feh processes.
+traceXS :: String -> X ()
+traceXS l = do
+    withWindowSet $ \ws -> do
+      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
+        ts <- mapM (runQuery title) (W.integrate s)
+        trace "Tiled:"
+        trace (show ts)
+      trace "Floating:"
+      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
+      trace (show fs)
+    trace l
+    xs <- XS.gets (viewA processList `asTypeOf` const [xmobarBot])
+    mapM_ (trace . show) xs
+    ts <- XS.gets (viewA processList `asTypeOf` const [trayer])
+    mapM_ (trace . show) ts
+    fs <- XS.gets (viewA processList `asTypeOf` const [feh])
+    mapM_ (trace . show) fs
+
+-- END docks and programs }}}
+
+-- Key for hiding all docks defined by handleDocks, keys for hiding particular
+-- dock, if any, defined in that dock definition (see above).
+myKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
+myKeys XConfig {modMask = m} =
+      [ 
+      --((m .|. shiftMask, xK_p), spawn "exec gmrun")
+        ((m .|. shiftMask, xK_z), lock)
+      , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
+      , ((0,           xK_Print), spawn "scrot")
+      , ((m,           xK_n), stopP xmobarBot)
+      , ((m .|. shiftMask, xK_n), startP xmobarBot)
+      -- For testing two screens.
+      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
+
+      -- Audio keys.
+      , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
+      -- FIXME: This really not exactly what i want. I want, that if sound is
+      -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
+      , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
+                                                 ++ "amixer set Master 1311+")
+      , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
+      ]
+
+-- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
+-- resolution is 1680x1050 .
+testTwoScreen :: FixedLayout a
+testTwoScreen       = fixedLayout
+                        [ Rectangle 0 17 1680 536
+                        , Rectangle 0 553 1680 480
+                        ]
 
 -- FIXME: When i wait for xtrlock process to terminate, i always come back to
 -- old workpace, where i was before pressing lock keys (regardless of
 -- workpspace switching code) and all windows are closed on it. Why? But it
 -- does not close windows, if i comment out code, obtaining current
 -- workspace..
-
+-- 
 -- Get current workspace tag, then switch to workspace "lock" (dedicated for
 -- "xtrlock" and inaccessible for workspace switch keys) and lock. After
 -- unlocking return back to workspace, where i was before.
@@ -84,23 +198,4 @@ lock                = do
                         (_, _, _, p) <-
                             createProcess (proc "/usr/bin/xtrlock" [])
                         return p
-
--- My key bindings. They are intended for use with alterKeys only.
-myKeys :: XConfig l -> M.Map (ButtonMask, KeySym) (X ())
-myKeys (XConfig {modMask = m}) =
-    M.fromList
-      [ 
-      --((m .|. shiftMask, xK_p), spawn "exec gmrun")
-        ((m .|. shiftMask, xK_z), lock)
-      , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
-      , ((0,           xK_Print), spawn "scrot")
-
-      -- Audio keys.
-      , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
-      -- FIXME: This really not exactly what i want. I want, that if sound is
-      -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
-      , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
-          					 ++ "amixer set Master 1311+")
-      , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
-      ]
 
