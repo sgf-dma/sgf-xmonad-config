@@ -5,7 +5,6 @@
 import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
-import qualified XMonad.Util.ExtensibleState as XS
 import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
@@ -45,8 +44,8 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    , logHook = traceXS "traceXS"
-                    , startupHook = restartP' feh >> return ()
+                    , logHook = myTrace
+                    , startupHook = myPrograms
                     }
     handleVnc xcf >>= xmonad
 
@@ -63,7 +62,7 @@ handleFullscreen cf = cf
 
 -- Docks and programs {{{
 myDocks :: LayoutClass l Window => [DockConfig l]
-myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
+myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
 -- Note, that because i redefine PP, Xmobar implementation assumes, that
 -- StdinReader is used in .xmobarrc, and opens pipe to xmobar. Thus, if
@@ -71,17 +70,19 @@ myDocks     = addDock trayer : map addDock [xmobarTop, xmobarBot]
 -- freeze, when pipe fills up. See
 -- https://wiki.haskell.org/Xmonad/Frequently_asked_questions#XMonad_is_frozen.21
 -- .
-xmobarTop :: Xmobar
-xmobarTop           = setA (xmobarPP . maybeL . ppTitleL) t
+-- Main xmobar, which does not have hiding (Strut toggle) key.
+xmobar :: Xmobar
+xmobar              = setA (xmobarPP . maybeL . ppTitleL) t
                         $ defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
-xmobarBot :: Xmobar
-xmobarBot     = setA xmobarConf (".xmobarrc2")
-                  . setA (xmobarPP . maybeL . ppTitleL) t
-                  . setA xmobarToggle (Just (shiftMask, xK_b))
-                  $ defaultXmobar
+-- Alternative xmobar, which has hiding (Strut toggle) key.
+xmobarAlt :: Xmobar
+xmobarAlt           = setA xmobarConf (".xmobarrc2")
+                        . setA (xmobarPP . maybeL . ppTitleL) t
+                        . setA xmobarToggle (Just (shiftMask, xK_b))
+                        $ defaultXmobar
    where
     t :: String -> String
     t               = xmobarColor "red" "" . shorten 50
@@ -99,6 +100,12 @@ trayer              = Trayer $ setA dockBin "trayer"
                             , "--height", "12"
                             ]
                         $ defaultDock
+
+
+myPrograms :: X ()
+myPrograms          = do
+    _ <- restartP' feh
+    return ()
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
@@ -118,26 +125,23 @@ feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
 
--- Print all tracked in Extensible state Xmobar, Trayer and Feh processes.
-traceXS :: String -> X ()
-traceXS l = do
+-- END docks and programs }}}
+
+-- Print some information.
+myTrace :: X ()
+myTrace             = do
     withWindowSet $ \ws -> do
       whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
         ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled:"
+        trace "Tiled windows:"
         trace (show ts)
-      trace "Floating:"
+      trace "Floating windows:"
       fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
       trace (show fs)
-    trace l
-    xs <- XS.gets (viewA processList `asTypeOf` const [xmobarBot])
-    mapM_ (trace . show) xs
-    ts <- XS.gets (viewA processList `asTypeOf` const [trayer])
-    mapM_ (trace . show) ts
-    fs <- XS.gets (viewA processList `asTypeOf` const [feh])
-    mapM_ (trace . show) fs
-
--- END docks and programs }}}
+    trace "Tracked programs:"
+    traceP xmobar
+    traceP trayer
+    traceP feh
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
@@ -148,8 +152,8 @@ myKeys XConfig {modMask = m} =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_n), stopP xmobarBot)
-      , ((m .|. shiftMask, xK_n), startP xmobarBot)
+      , ((m,           xK_n), stopP xmobarAlt)
+      , ((m .|. shiftMask, xK_n), startP xmobarAlt)
       -- For testing two screens.
       , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
       , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
