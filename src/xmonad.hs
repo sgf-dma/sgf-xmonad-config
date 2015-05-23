@@ -33,6 +33,7 @@ main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
+                . handleProgs myPrograms
                 . handleDocks (0, xK_b) myDocks
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
@@ -44,7 +45,6 @@ main_0              = do
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
                     , logHook = myTrace
-                    , startupHook = myPrograms
                     }
     handleVnc xcf >>= xmonad
 
@@ -107,10 +107,8 @@ trayer              = Trayer $ setA progBin "trayer"
                         $ defaultProgram
 
 
-myPrograms :: X ()
-myPrograms          = do
-    _ <- restartP' feh
-    return ()
+myPrograms :: LayoutClass l Window =>[ProgConfig l]
+myPrograms          = [addProg feh]
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
