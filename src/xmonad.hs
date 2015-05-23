@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 import XMonad
 import XMonad.Layout.NoBorders
@@ -34,6 +33,7 @@ main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
+                . handleProgs myPrograms
                 . handleDocks (0, xK_b) myDocks
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
@@ -45,7 +45,6 @@ main_0              = do
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
                     , logHook = myTrace
-                    , startupHook = myPrograms
                     }
     handleVnc xcf >>= xmonad
 
@@ -72,26 +71,28 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- .
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
-xmobar              = setA (xmobarPP . maybeL . ppTitleL) t
-                        $ defaultXmobar
+xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
+                        defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
-xmobarAlt           = setA xmobarConf (".xmobarrc2")
-                        . setA (xmobarPP . maybeL . ppTitleL) t
+xmobarAlt           = setA xmobarConf ".xmobarrc2"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
                         $ defaultXmobar
-   where
-    t :: String -> String
-    t               = xmobarColor "red" "" . shorten 50
 
-newtype Trayer      = Trayer Dock
-  deriving (Eq, Show, Read, Typeable, ProcessClass, RestartClass, DockClass)
+newtype Trayer      = Trayer Program
+  deriving (Eq, Show, Read, Typeable)
+instance ProcessClass Trayer where
+    pidL f (Trayer x)   = Trayer <$> pidL f x
+instance RestartClass Trayer where
+    runP (Trayer x)     = Trayer <$> runP x
+instance DockClass Trayer where
+
 trayer :: Trayer
-trayer              = Trayer $ setA dockBin "trayer"
-                        . setA dockArgs 
+trayer              = Trayer $ setA progBin "trayer"
+                        . setA progArgs
                             [ "--edge", "top", "--align", "right"
                             , "--SetDockType", "true"
                             , "--SetPartialStrut", "true"
@@ -99,17 +100,17 @@ trayer              = Trayer $ setA dockBin "trayer"
                             , "--transparent", "true" , "--tint", "0x191970"
                             , "--height", "12"
                             ]
-                        $ defaultDock
+                        $ defaultProgram
 
 
-myPrograms :: X ()
-myPrograms          = do
-    _ <- restartP' feh
-    return ()
+myPrograms :: LayoutClass l Window =>[ProgConfig l]
+myPrograms          = [addProg feh]
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
-  deriving (Eq, Show, Read, Typeable, ProcessClass)
+  deriving (Eq, Show, Read, Typeable)
+instance ProcessClass Feh where
+    pidL f (Feh x)  = Feh <$> pidL f x
 instance RestartClass Feh where
     runP (Feh x)    = do
         cmd <- liftIO $ do
@@ -120,6 +121,7 @@ instance RestartClass Feh where
             then readFile f
             else return "xsetroot -grey"
         Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
+
 feh :: Feh
 feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
