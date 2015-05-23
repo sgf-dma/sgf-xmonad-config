@@ -71,7 +71,7 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- .
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
-xmobar              = setA (xmobarPP . maybeL . ppTitleL) t
+xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
                         $ defaultXmobar
   where
     t :: String -> String
@@ -79,12 +79,8 @@ xmobar              = setA (xmobarPP . maybeL . ppTitleL) t
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
 xmobarAlt           = setA xmobarConf (".xmobarrc2")
-                        . setA (xmobarPP . maybeL . ppTitleL) t
                         . setA xmobarToggle (Just (shiftMask, xK_b))
                         $ defaultXmobar
-   where
-    t :: String -> String
-    t               = xmobarColor "red" "" . shorten 50
 
 newtype Trayer      = Trayer Program
   deriving (Eq, Show, Read, Typeable)
