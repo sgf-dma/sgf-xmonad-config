@@ -79,7 +79,7 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
     t               = xmobarColor "green" "" . shorten 50
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
-xmobarAlt           = setA xmobarConf ".xmobarrc2"
+xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
                         . setA xmobarLaunch (Just (shiftMask, xK_x))
                         $ defaultXmobar
