@@ -33,8 +33,8 @@ main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
-                . handleProgs myPrograms
-                . handleDocks (0, xK_b) myDocks
+                . handleDocks (0, xK_b)
+                . handleProgs (myPrograms ++ myDocks)
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
                     {
@@ -44,7 +44,7 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    , logHook = myTrace
+                    --, logHook = myTrace
                     }
     handleVnc xcf >>= xmonad
 
@@ -60,7 +60,7 @@ handleFullscreen cf = cf
     }
 
 -- Docks and programs {{{
-myDocks :: LayoutClass l Window => [DockConfig l]
+myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
 -- Note, that because i redefine PP, Xmobar implementation assumes, that
@@ -72,7 +72,8 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        defaultXmobar
+                        . setA xmobarLaunch (Just (0, xK_x))
+                        $ defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
@@ -80,6 +81,7 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
 xmobarAlt :: Xmobar
 xmobarAlt           = setA xmobarConf ".xmobarrc2"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
+                        . setA xmobarLaunch (Just (shiftMask, xK_x))
                         $ defaultXmobar
 
 newtype Trayer      = Trayer Program
@@ -88,6 +90,7 @@ instance ProcessClass Trayer where
     pidL f (Trayer x)   = Trayer <$> pidL f x
 instance RestartClass Trayer where
     runP (Trayer x)     = Trayer <$> runP x
+    doLaunchP           = restartP
 instance DockClass Trayer where
 
 trayer :: Trayer
@@ -126,6 +129,17 @@ feh :: Feh
 feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
+
+newtype XClock      = XClock Program
+  deriving (Eq, Show, Read, Typeable)
+instance ProcessClass XClock where
+    pidL f (XClock x)   = XClock <$> pidL f x
+instance RestartClass XClock where
+    runP (XClock x)     = XClock <$> runP x
+    manageP (XClock _)  = doShift "7"
+xclock :: XClock
+xclock          = XClock $ setA progBin "xclock" defaultProgram
+
 
 -- END docks and programs }}}
 
