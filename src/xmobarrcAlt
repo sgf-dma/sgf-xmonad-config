@@ -1,7 +1,7 @@
 Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
        , bgColor = "grey"
        , fgColor = "black"
-       , position = TopW L 90
+       , position = Bottom
        , overrideRedirect = False
        , commands = [ Run MultiCpu ["-t", "<total0>%/<total1>%", "-L","10","-H","70","-n","blue","-h","red"] 10
 		    , Run CoreTemp ["-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
@@ -17,5 +17,5 @@ Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
                     ]
        , sepChar = "%"
        , alignSep = "}{"
-       , template = "%StdinReader% } %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork%, %wlan0wi% * %battery% "
+       , template = "} %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork%, %wlan0wi% * %battery% "
        }
