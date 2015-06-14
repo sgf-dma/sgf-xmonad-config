@@ -73,7 +73,7 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        . setA xmobarLaunch (Just (0, xK_x))
+                        . setA xmobarLaunch [(0, xK_x)]
                         $ defaultXmobar
   where
     t :: String -> String
@@ -82,7 +82,7 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
 xmobarAlt :: Xmobar
 xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
-                        . setA xmobarLaunch (Just (shiftMask, xK_x))
+                        . setA xmobarLaunch [(shiftMask, xK_x)]
                         $ defaultXmobar
 
 newtype Trayer      = Trayer Program
@@ -162,7 +162,7 @@ instance ProcessClass XTermUser where
 instance RestartClass XTermUser where
     runP (XTermUser x)      = XTermUser <$> runP x
     manageP (XTermUser _)   = doShift "2"
-    launchKey               = const (Just (0, xK_v))
+    launchKey               = const [(0, xK_v), (0, xK_a)]
 xtermUser :: XTermUser
 xtermUser           = XTermUser
                         . setA progBin "xterm"
@@ -180,7 +180,7 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const (Just (0, xK_v))
+    launchKey               = const [(0, xK_v), (0,xK_a)]
 xtermRoot :: XTermRoot
 xtermRoot           = XTermRoot
                         . setA progBin "xterm"
