@@ -34,8 +34,8 @@ main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
-                . handleDocks (0, xK_b)
-                . handleProgs (myPrograms ++ myDocks)
+                . handleDocks (Just (0, xK_b))
+                . handleProgs (Just (0, xK_s)) (myPrograms ++ myDocks)
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
                     {
@@ -162,6 +162,7 @@ instance ProcessClass XTermUser where
 instance RestartClass XTermUser where
     runP (XTermUser x)      = XTermUser <$> runP x
     manageP (XTermUser _)   = doShift "2"
+    launchKey               = const (Just (0, xK_v))
 xtermUser :: XTermUser
 xtermUser           = XTermUser
                         . setA progBin "xterm"
@@ -179,6 +180,7 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
+    launchKey               = const (Just (0, xK_v))
 xtermRoot :: XTermRoot
 xtermRoot           = XTermRoot
                         . setA progBin "xterm"
