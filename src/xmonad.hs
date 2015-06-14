@@ -111,7 +111,7 @@ trayer              = Trayer $ setA progBin "trayer"
 
 
 myPrograms :: LayoutClass l Window =>[ProgConfig l]
-myPrograms          = [addProg feh, addProg xtermUser, addProg xtermRoot]
+myPrograms          = [addProg feh, addProg xtermUser, addProg xtermRoot, addProg firefox]
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
@@ -186,6 +186,24 @@ xtermRoot           = XTermRoot
                         . setA progBin "xterm"
                         . setA progArgs ["-fg", "black", "-bg", "white"
                                         , "-e", "tmux at"]
+                        $ defaultProgram
+
+-- Firefox.
+newtype Firefox     = Firefox Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Firefox where
+    (Firefox x) `mappend` (Firefox y) = Firefox (x `mappend` y)
+    mempty          = Firefox mempty
+instance ProcessClass Firefox where
+    pidL f (Firefox x)    = Firefox <$> pidL f x
+instance RestartClass Firefox where
+    runP (Firefox x)    = Firefox <$> runP x
+    manageP (Firefox _) = doShift "1"
+    launchAtStartup     = const False
+    launchKey           = const [(0,xK_a)]
+firefox :: Firefox
+firefox             = Firefox
+                        . setA progBin "firefox"
                         $ defaultProgram
 
 -- END docks and programs }}}
