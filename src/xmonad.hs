@@ -12,6 +12,7 @@ import XMonad.Util.EZConfig (additionalKeys)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
+import Data.Monoid
 import Control.Applicative
 import System.Process
 
@@ -86,6 +87,9 @@ xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
 
 newtype Trayer      = Trayer Program
   deriving (Eq, Show, Read, Typeable)
+instance Monoid Trayer where
+    (Trayer x) `mappend` (Trayer y) = Trayer (x `mappend` y)
+    mempty          = Trayer mempty
 instance ProcessClass Trayer where
     pidL f (Trayer x)   = Trayer <$> pidL f x
 instance RestartClass Trayer where
@@ -107,11 +111,14 @@ trayer              = Trayer $ setA progBin "trayer"
 
 
 myPrograms :: LayoutClass l Window =>[ProgConfig l]
-myPrograms          = [addProg feh]
+myPrograms          = [addProg feh, addProg xtermUser, addProg xtermRoot]
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
   deriving (Eq, Show, Read, Typeable)
+instance Monoid Feh where
+    (Feh x) `mappend` (Feh y) = Feh (x `mappend` y)
+    mempty          = Feh mempty
 instance ProcessClass Feh where
     pidL f (Feh x)  = Feh <$> pidL f x
 instance RestartClass Feh where
@@ -121,6 +128,7 @@ instance RestartClass Feh where
           let f = h </> ".fehbg"
           b <- doesFileExist f
           if b
+            -- FIXME: Close file.
             then readFile f
             else return "xsetroot -grey"
         Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
@@ -132,6 +140,9 @@ feh                 = Feh   $ setA progBin "/bin/sh"
 
 newtype XClock      = XClock Program
   deriving (Eq, Show, Read, Typeable)
+instance Monoid XClock where
+    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
+    mempty          = XClock mempty
 instance ProcessClass XClock where
     pidL f (XClock x)   = XClock <$> pidL f x
 instance RestartClass XClock where
@@ -140,6 +151,40 @@ instance RestartClass XClock where
 xclock :: XClock
 xclock          = XClock $ setA progBin "xclock" defaultProgram
 
+-- User terminal.
+newtype XTermUser   = XTermUser Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid XTermUser where
+    (XTermUser x) `mappend` (XTermUser y) = XTermUser (x `mappend` y)
+    mempty          = XTermUser mempty
+instance ProcessClass XTermUser where
+    pidL f (XTermUser x)    = XTermUser <$> pidL f x
+instance RestartClass XTermUser where
+    runP (XTermUser x)      = XTermUser <$> runP x
+    manageP (XTermUser _)   = doShift "2"
+xtermUser :: XTermUser
+xtermUser           = XTermUser
+                        . setA progBin "xterm"
+                        . setA progArgs ["-fg", "white", "-bg", "pink"]
+                        $ defaultProgram
+
+-- Root terminal.
+newtype XTermRoot   = XTermRoot Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid XTermRoot where
+    (XTermRoot x) `mappend` (XTermRoot y) = XTermRoot (x `mappend` y)
+    mempty          = XTermRoot mempty
+instance ProcessClass XTermRoot where
+    pidL f (XTermRoot x)    = XTermRoot <$> pidL f x
+instance RestartClass XTermRoot where
+    runP (XTermRoot x)      = XTermRoot <$> runP x
+    manageP (XTermRoot _)   = doShift "3"
+xtermRoot :: XTermRoot
+xtermRoot           = XTermRoot
+                        . setA progBin "xterm"
+                        . setA progArgs ["-fg", "black", "-bg", "white"
+                                        , "-e", "tmux at"]
+                        $ defaultProgram
 
 -- END docks and programs }}}
 
@@ -155,6 +200,8 @@ myTrace             = do
       fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
       trace (show fs)
     trace "Tracked programs:"
+    traceP xtermUser
+    traceP xtermRoot
     traceP xmobar
     traceP trayer
     traceP feh
