@@ -60,9 +60,26 @@ handleFullscreen cf = cf
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
 
--- Docks and programs {{{
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
+
+myPrograms :: LayoutClass l Window =>[ProgConfig l]
+myPrograms          = [ addProg feh
+                      , addProg xtermUser, addProg xtermRoot
+                      , addProg firefox
+                      , addProg skype
+                      , addProg pidgin
+                      ]
+
+-- Session with instant messengers.
+sessionIMKey :: (ButtonMask, KeySym)
+sessionIMKey        = (shiftMask, xK_s)
+-- Minimal session key and all other session keys. Should be used for
+-- programs, which must run in any session (e.g. firefox or terminal).
+sessionKeys :: [(ButtonMask, KeySym)]
+sessionKeys         = [(0, xK_s), sessionIMKey]
+
+-- Docks {{{
 
 -- Note, that because i redefine PP, Xmobar implementation assumes, that
 -- StdinReader is used in .xmobarrc, and opens pipe to xmobar. Thus, if
@@ -107,12 +124,8 @@ trayer              = Trayer $ setA progBin "trayer"
                             ]
                         $ defaultProgram
 
-
-myPrograms :: LayoutClass l Window =>[ProgConfig l]
-myPrograms          = [ addProg feh
-                      , addProg xtermUser, addProg xtermRoot
-                      , addProg firefox
-                      ]
+-- END Docks }}}
+-- Programs {{{
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
@@ -137,19 +150,6 @@ feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
 
-newtype XClock      = XClock Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XClock where
-    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
-    mempty          = XClock mempty
-instance ProcessClass XClock where
-    pidL f (XClock x)   = XClock <$> pidL f x
-instance RestartClass XClock where
-    runP (XClock x)     = XClock <$> runP x
-    manageP (XClock _)  = doShift "7"
-xclock :: XClock
-xclock          = XClock $ setA progBin "xclock" defaultProgram
-
 -- User terminal.
 newtype XTermUser   = XTermUser Program
   deriving (Eq, Show, Read, Typeable)
@@ -161,7 +161,7 @@ instance ProcessClass XTermUser where
 instance RestartClass XTermUser where
     runP (XTermUser x)      = XTermUser <$> runP x
     manageP (XTermUser _)   = doShift "2"
-    launchKey               = const [(0, xK_x), (shiftMask, xK_s)]
+    launchKey               = const ((0, xK_x) : sessionKeys)
 xtermUser :: XTermUser
 xtermUser           = XTermUser
                         . setA progBin "xterm"
@@ -180,7 +180,7 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const [(0, xK_x), (shiftMask, xK_s)]
+    launchKey               = const ((0, xK_x) : sessionKeys)
 xtermRoot :: XTermRoot
 xtermRoot           = XTermRoot
                         . setA progBin "xterm"
@@ -188,25 +188,68 @@ xtermRoot           = XTermRoot
                                         , "-e", "tmux at -t root"]
                         $ defaultProgram
 
--- Firefox.
 newtype Firefox     = Firefox Program
   deriving (Eq, Show, Read, Typeable)
 instance Monoid Firefox where
     (Firefox x) `mappend` (Firefox y) = Firefox (x `mappend` y)
     mempty          = Firefox mempty
 instance ProcessClass Firefox where
-    pidL f (Firefox x)    = Firefox <$> pidL f x
+    pidL f (Firefox x)  = Firefox <$> pidL f x
 instance RestartClass Firefox where
     runP (Firefox x)    = Firefox <$> runP x
     manageP (Firefox _) = doShift "1"
     launchAtStartup     = const False
-    launchKey           = const [(0, xK_f), (shiftMask, xK_s)]
+    launchKey           = const ((0, xK_f) : sessionKeys)
 firefox :: Firefox
 firefox             = Firefox
                         . setA progBin "firefox"
                         $ defaultProgram
 
--- END docks and programs }}}
+newtype Skype       = Skype Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Skype where
+    (Skype x) `mappend` (Skype y) = Skype (x `mappend` y)
+    mempty          = Skype mempty
+instance ProcessClass Skype where
+    pidL f (Skype x)    = Skype <$> pidL f x
+instance RestartClass Skype where
+    runP (Skype x)      = Skype <$> runP x
+    manageP (Skype _)   = doShift "4"
+    launchAtStartup     = const False
+    launchKey           = const [(0, xK_i), sessionIMKey]
+skype :: Skype
+skype               = Skype $ setA progBin "skype" defaultProgram
+
+newtype Pidgin      = Pidgin Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Pidgin where
+    (Pidgin x) `mappend` (Pidgin y) = Pidgin (x `mappend` y)
+    mempty          = Pidgin mempty
+instance ProcessClass Pidgin where
+    pidL f (Pidgin x)   = Pidgin <$> pidL f x
+instance RestartClass Pidgin where
+    runP (Pidgin x)     = Pidgin <$> runP x
+    manageP (Pidgin _)  = doShift "4"
+    launchAtStartup     = const False
+    launchKey           = const [(shiftMask, xK_i), sessionIMKey]
+pidgin :: Pidgin
+pidgin              = Pidgin $ setA progBin "pidgin" defaultProgram
+
+-- Just for testing.
+newtype XClock      = XClock Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid XClock where
+    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
+    mempty          = XClock mempty
+instance ProcessClass XClock where
+    pidL f (XClock x)   = XClock <$> pidL f x
+instance RestartClass XClock where
+    runP (XClock x)     = XClock <$> runP x
+    manageP (XClock _)  = doShift "7"
+xclock :: XClock
+xclock          = XClock $ setA progBin "xclock" defaultProgram
+
+-- END programs }}}
 
 -- Print some information.
 myTrace :: X ()
