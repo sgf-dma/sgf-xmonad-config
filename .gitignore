@@ -1,5 +1,7 @@
 t.*
 *.o
 *.hi
+dist/
+
 nohup.out
 xmonad.errors
