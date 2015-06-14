@@ -60,9 +60,26 @@ handleFullscreen cf = cf
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
 
--- Docks and programs {{{
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
+
+myPrograms :: LayoutClass l Window =>[ProgConfig l]
+myPrograms          = [ addProg feh
+                      , addProg xtermUser, addProg xtermRoot
+                      , addProg firefox
+                      , addProg skype
+                      , addProg pidgin
+                      ]
+
+-- Session with instant messengers.
+sessionIMKey :: (ButtonMask, KeySym)
+sessionIMKey        = (shiftMask, xK_s)
+-- Minimal session key and all other session keys. Should be used for
+-- programs, which must run in any session (e.g. firefox or terminal).
+sessionKeys :: [(ButtonMask, KeySym)]
+sessionKeys         = [(0, xK_s), sessionIMKey]
+
+-- Docks {{{
 
 -- Note, that because i redefine PP, Xmobar implementation assumes, that
 -- StdinReader is used in .xmobarrc, and opens pipe to xmobar. Thus, if
@@ -73,7 +90,6 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        . setA xmobarLaunch (Just (0, xK_x))
                         $ defaultXmobar
   where
     t :: String -> String
@@ -82,7 +98,6 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
 xmobarAlt :: Xmobar
 xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
-                        . setA xmobarLaunch (Just (shiftMask, xK_x))
                         $ defaultXmobar
 
 newtype Trayer      = Trayer Program
@@ -109,9 +124,8 @@ trayer              = Trayer $ setA progBin "trayer"
                             ]
                         $ defaultProgram
 
-
-myPrograms :: LayoutClass l Window =>[ProgConfig l]
-myPrograms          = [addProg feh, addProg xtermUser, addProg xtermRoot]
+-- END Docks }}}
+-- Programs {{{
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
@@ -128,28 +142,13 @@ instance RestartClass Feh where
           let f = h </> ".fehbg"
           b <- doesFileExist f
           if b
-            -- FIXME: Close file.
             then readFile f
             else return "xsetroot -grey"
         Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
-
 feh :: Feh
 feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
-
-newtype XClock      = XClock Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XClock where
-    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
-    mempty          = XClock mempty
-instance ProcessClass XClock where
-    pidL f (XClock x)   = XClock <$> pidL f x
-instance RestartClass XClock where
-    runP (XClock x)     = XClock <$> runP x
-    manageP (XClock _)  = doShift "7"
-xclock :: XClock
-xclock          = XClock $ setA progBin "xclock" defaultProgram
 
 -- User terminal.
 newtype XTermUser   = XTermUser Program
@@ -162,11 +161,12 @@ instance ProcessClass XTermUser where
 instance RestartClass XTermUser where
     runP (XTermUser x)      = XTermUser <$> runP x
     manageP (XTermUser _)   = doShift "2"
-    launchKey               = const (Just (0, xK_v))
+    launchKey               = const ((0, xK_x) : sessionKeys)
 xtermUser :: XTermUser
 xtermUser           = XTermUser
                         . setA progBin "xterm"
-                        . setA progArgs ["-fg", "white", "-bg", "pink"]
+                        . setA progArgs ["-fg", "black", "-bg", "white"
+                                        , "-e", "tmux at -t main"]
                         $ defaultProgram
 
 -- Root terminal.
@@ -180,15 +180,76 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const (Just (0, xK_v))
+    launchKey               = const ((0, xK_x) : sessionKeys)
 xtermRoot :: XTermRoot
 xtermRoot           = XTermRoot
                         . setA progBin "xterm"
                         . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at"]
+                                        , "-e", "tmux at -t root"]
                         $ defaultProgram
 
--- END docks and programs }}}
+newtype Firefox     = Firefox Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Firefox where
+    (Firefox x) `mappend` (Firefox y) = Firefox (x `mappend` y)
+    mempty          = Firefox mempty
+instance ProcessClass Firefox where
+    pidL f (Firefox x)  = Firefox <$> pidL f x
+instance RestartClass Firefox where
+    runP (Firefox x)    = Firefox <$> runP x
+    manageP (Firefox _) = doShift "1"
+    launchAtStartup     = const False
+    launchKey           = const ((0, xK_f) : sessionKeys)
+firefox :: Firefox
+firefox             = Firefox
+                        . setA progBin "firefox"
+                        $ defaultProgram
+
+newtype Skype       = Skype Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Skype where
+    (Skype x) `mappend` (Skype y) = Skype (x `mappend` y)
+    mempty          = Skype mempty
+instance ProcessClass Skype where
+    pidL f (Skype x)    = Skype <$> pidL f x
+instance RestartClass Skype where
+    runP (Skype x)      = Skype <$> runP x
+    manageP (Skype _)   = doShift "4"
+    launchAtStartup     = const False
+    launchKey           = const [(0, xK_i), sessionIMKey]
+skype :: Skype
+skype               = Skype $ setA progBin "skype" defaultProgram
+
+newtype Pidgin      = Pidgin Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid Pidgin where
+    (Pidgin x) `mappend` (Pidgin y) = Pidgin (x `mappend` y)
+    mempty          = Pidgin mempty
+instance ProcessClass Pidgin where
+    pidL f (Pidgin x)   = Pidgin <$> pidL f x
+instance RestartClass Pidgin where
+    runP (Pidgin x)     = Pidgin <$> runP x
+    manageP (Pidgin _)  = doShift "4"
+    launchAtStartup     = const False
+    launchKey           = const [(shiftMask, xK_i), sessionIMKey]
+pidgin :: Pidgin
+pidgin              = Pidgin $ setA progBin "pidgin" defaultProgram
+
+-- Just for testing.
+newtype XClock      = XClock Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid XClock where
+    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
+    mempty          = XClock mempty
+instance ProcessClass XClock where
+    pidL f (XClock x)   = XClock <$> pidL f x
+instance RestartClass XClock where
+    runP (XClock x)     = XClock <$> runP x
+    manageP (XClock _)  = doShift "7"
+xclock :: XClock
+xclock          = XClock $ setA progBin "xclock" defaultProgram
+
+-- END programs }}}
 
 -- Print some information.
 myTrace :: X ()
@@ -217,12 +278,13 @@ myKeys XConfig {modMask = m} =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_n), stopP xmobarAlt)
-      , ((m .|. shiftMask, xK_n), startP xmobarAlt)
       -- For testing two screens.
-      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
-      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
+      --, ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
+      -- Programs.
+      , ( (m .|. shiftMask, xK_f)
+        , spawn "exec firefox -no-remote -ProfileManager")
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
       -- FIXME: This really not exactly what i want. I want, that if sound is
