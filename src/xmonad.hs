@@ -73,7 +73,6 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        . setA xmobarLaunch [(0, xK_x)]
                         $ defaultXmobar
   where
     t :: String -> String
@@ -82,7 +81,6 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
 xmobarAlt :: Xmobar
 xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
-                        . setA xmobarLaunch [(shiftMask, xK_x)]
                         $ defaultXmobar
 
 newtype Trayer      = Trayer Program
@@ -111,7 +109,10 @@ trayer              = Trayer $ setA progBin "trayer"
 
 
 myPrograms :: LayoutClass l Window =>[ProgConfig l]
-myPrograms          = [addProg feh, addProg xtermUser, addProg xtermRoot, addProg firefox]
+myPrograms          = [ addProg feh
+                      , addProg xtermUser, addProg xtermRoot
+                      , addProg firefox
+                      ]
 
 -- Use `xsetroot -grey`, if no .fehbg found.
 newtype Feh         = Feh Program
@@ -128,11 +129,9 @@ instance RestartClass Feh where
           let f = h </> ".fehbg"
           b <- doesFileExist f
           if b
-            -- FIXME: Close file.
             then readFile f
             else return "xsetroot -grey"
         Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
-
 feh :: Feh
 feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
@@ -162,11 +161,12 @@ instance ProcessClass XTermUser where
 instance RestartClass XTermUser where
     runP (XTermUser x)      = XTermUser <$> runP x
     manageP (XTermUser _)   = doShift "2"
-    launchKey               = const [(0, xK_v), (0, xK_a)]
+    launchKey               = const [(0, xK_x), (shiftMask, xK_s)]
 xtermUser :: XTermUser
 xtermUser           = XTermUser
                         . setA progBin "xterm"
-                        . setA progArgs ["-fg", "white", "-bg", "pink"]
+                        . setA progArgs ["-fg", "black", "-bg", "white"
+                                        , "-e", "tmux at -t main"]
                         $ defaultProgram
 
 -- Root terminal.
@@ -180,12 +180,12 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const [(0, xK_v), (0,xK_a)]
+    launchKey               = const [(0, xK_x), (shiftMask, xK_s)]
 xtermRoot :: XTermRoot
 xtermRoot           = XTermRoot
                         . setA progBin "xterm"
                         . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at"]
+                                        , "-e", "tmux at -t root"]
                         $ defaultProgram
 
 -- Firefox.
@@ -200,7 +200,7 @@ instance RestartClass Firefox where
     runP (Firefox x)    = Firefox <$> runP x
     manageP (Firefox _) = doShift "1"
     launchAtStartup     = const False
-    launchKey           = const [(0,xK_a)]
+    launchKey           = const [(0, xK_f), (shiftMask, xK_s)]
 firefox :: Firefox
 firefox             = Firefox
                         . setA progBin "firefox"
@@ -235,12 +235,13 @@ myKeys XConfig {modMask = m} =
         ((m .|. shiftMask, xK_z), lock)
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
-      , ((m,           xK_n), stopP xmobarAlt)
-      , ((m .|. shiftMask, xK_n), startP xmobarAlt)
       -- For testing two screens.
-      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
-      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
+      --, ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
+      -- Programs.
+      , ( (m .|. shiftMask, xK_f)
+        , spawn "exec firefox -no-remote -ProfileManager")
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
       -- FIXME: This really not exactly what i want. I want, that if sound is
