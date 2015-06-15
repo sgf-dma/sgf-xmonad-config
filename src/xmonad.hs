@@ -10,6 +10,8 @@ import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 
+import Data.Maybe
+import Control.Monad
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Data.Monoid
@@ -45,7 +47,8 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    --, logHook = myTrace
+                    --, manageHook = traceFloat
+                    --, logHook = traceWindowSet
                     }
     handleVnc xcf >>= xmonad
 
@@ -251,23 +254,45 @@ xclock          = XClock $ setA progBin "xclock" defaultProgram
 
 -- END programs }}}
 
--- Print some information.
-myTrace :: X ()
-myTrace             = do
+-- Some debug traces.
+
+-- Log all windows (tiled and floating).
+traceWindowSet :: X ()
+traceWindowSet      = do
+    trace "Windows:"
     withWindowSet $ \ws -> do
       whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
         ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled windows:"
-        trace (show ts)
-      trace "Floating windows:"
+        trace $ "Tiled: " ++ show ts
       fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
-      trace (show fs)
+      when (not (null fs)) $ trace ("Floating: " ++ show fs)
+
+-- Log programs stored in Extensible State.
+tracePrograms :: X ()
+tracePrograms       = do
     trace "Tracked programs:"
     traceP xtermUser
     traceP xtermRoot
     traceP xmobar
     traceP trayer
     traceP feh
+
+-- Log windows, which would be made floating by default (particularly, by
+-- `manage` from XMonad/Operations.hs), and why they would.
+traceFloat :: ManageHook
+traceFloat          = do
+    w <- ask
+    t <- title
+    liftX $ withDisplay $ \d -> do
+      sh <- io $ getWMNormalHints d w
+      let isFixedSize = sh_min_size sh /= Nothing
+                          && sh_min_size sh == sh_max_size sh
+      isTransient <- isJust <$> io (getTransientForHint d w)
+      when isFixedSize $
+        trace ("Fixed size window " ++ show w ++ " \"" ++ t ++ "\"")
+      when isTransient $
+        trace ("Transient window " ++ show w ++ " \"" ++ t ++ "\"")
+    return idHook
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
