@@ -12,7 +12,6 @@ import XMonad.Util.EZConfig (additionalKeys)
 
 import Data.Maybe
 import Control.Monad
-import Control.Concurrent (threadDelay)
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Data.Monoid
@@ -38,7 +37,6 @@ main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
                 . handleDocks (Just (0, xK_b))
-                -- . handleProgs (Just (0, xK_s)) (myPrograms ++ myDocks)
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
@@ -114,11 +112,7 @@ instance Monoid Trayer where
 instance ProcessClass Trayer where
     pidL f (Trayer x)   = Trayer <$> pidL f x
 instance RestartClass Trayer where
-    --runP (Trayer x)     = Trayer <$> runP x
-    runP (Trayer x)     = do
-                            x' <- Trayer <$> runP x
-                            io (threadDelay 300000)
-                            return x'
+    runP (Trayer x)     = Trayer <$> runP x
     doLaunchP           = restartP
 instance DockClass Trayer where
 
@@ -132,6 +126,7 @@ trayer              = Trayer $ setA progBin "trayer"
                             , "--transparent", "true" , "--tint", "0x191970"
                             , "--height", "12"
                             ]
+                        . setA progWait 300000
                         $ defaultProgram
 
 -- END Docks }}}
