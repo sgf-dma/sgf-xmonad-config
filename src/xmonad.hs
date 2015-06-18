@@ -12,6 +12,7 @@ import XMonad.Util.EZConfig (additionalKeys)
 
 import Data.Maybe
 import Control.Monad
+import Control.Concurrent (threadDelay)
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import qualified Data.Map as M
 import Data.Monoid
@@ -37,7 +38,8 @@ main_0              = do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFullscreen
                 . handleDocks (Just (0, xK_b))
-                . handleProgs (Just (0, xK_s)) (myPrograms ++ myDocks)
+                -- . handleProgs (Just (0, xK_s)) (myPrograms ++ myDocks)
+                . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
                     {
@@ -72,6 +74,7 @@ myPrograms          = [ addProg feh
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
+                      , addProg wpagui
                       ]
 
 -- Session with instant messengers.
@@ -111,7 +114,11 @@ instance Monoid Trayer where
 instance ProcessClass Trayer where
     pidL f (Trayer x)   = Trayer <$> pidL f x
 instance RestartClass Trayer where
-    runP (Trayer x)     = Trayer <$> runP x
+    --runP (Trayer x)     = Trayer <$> runP x
+    runP (Trayer x)     = do
+                            x' <- Trayer <$> runP x
+                            io (threadDelay 300000)
+                            return x'
     doLaunchP           = restartP
 instance DockClass Trayer where
 
@@ -251,6 +258,18 @@ instance RestartClass XClock where
     manageP (XClock _)  = doShift "7"
 xclock :: XClock
 xclock          = XClock $ setA progBin "xclock" defaultProgram
+
+newtype WpaGui      = WpaGui Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid WpaGui where
+    (WpaGui x) `mappend` (WpaGui y) = WpaGui (x `mappend` y)
+    mempty          = WpaGui mempty
+instance ProcessClass WpaGui where
+    pidL f (WpaGui x)   = WpaGui <$> pidL f x
+instance RestartClass WpaGui where
+    runP (WpaGui x)     = WpaGui <$> runP x
+wpagui :: WpaGui
+wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
 
 -- END programs }}}
 
