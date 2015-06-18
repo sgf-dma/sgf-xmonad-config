@@ -45,7 +45,7 @@ main_0              = do
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     , terminal = "xterm -fg black -bg white"
-                    --, manageHook = traceFloat
+                    , manageHook = noGrabFocus
                     --, logHook = traceWindowSet
                     }
     handleVnc xcf >>= xmonad
@@ -60,6 +60,11 @@ handleFullscreen cf = cf
     { layoutHook        = lessBorders OtherIndicated (layoutHook cf)
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
+
+-- Do not grab window focus for all windows, except launcher (`gmrun`).
+noGrabFocus :: ManageHook
+noGrabFocus         = not <$> className =? "Gmrun" -->
+                        return (Endo W.focusDown)
 
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
