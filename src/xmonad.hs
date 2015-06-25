@@ -25,6 +25,7 @@ import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
+import Sgf.XMonad.Util.Run
 import Sgf.XMonad.Trace
 
 main :: IO ()
@@ -44,7 +45,15 @@ main_0              = do
                     workspaces = map show [1..9] ++ ["lock"]
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
-                    , terminal = "xterm -fg black -bg white"
+                    -- Do not set terminal here: edit `xterm` value instead.
+                    -- Because proper conversion from Program to String (and
+                    -- back) should be done with respect to shell escaping
+                    -- rules, it's simpler to just redefine 'mod+shift+enter'
+                    -- to use Program value (`xterm`). I set terminal here,
+                    -- though, to make it roughly match to `xterm` value and
+                    -- to avoid conversion issues i just throw away all
+                    -- arguments: at least it's safe..
+                    , terminal = viewA progBin xterm
                     , manageHook = noGrabFocus
                     --, logHook = traceWindowSet
                     }
@@ -158,6 +167,10 @@ feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
 
+-- Program used as terminal.
+xterm :: Program
+xterm               = setA progBin "xterm" $ defaultProgram
+
 -- User terminal.
 newtype XTermUser   = XTermUser Program
   deriving (Eq, Show, Read, Typeable)
@@ -171,11 +184,7 @@ instance RestartClass XTermUser where
     manageP (XTermUser _)   = doShift "2"
     launchKey               = const ((0, xK_x) : sessionKeys)
 xtermUser :: XTermUser
-xtermUser           = XTermUser
-                        . setA progBin "xterm"
-                        . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at -t main"]
-                        $ defaultProgram
+xtermUser           = XTermUser xterm
 
 -- Root terminal.
 newtype XTermRoot   = XTermRoot Program
@@ -188,13 +197,9 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const ((0, xK_x) : sessionKeys)
+    launchKey               = const ((shiftMask, xK_x) : sessionKeys)
 xtermRoot :: XTermRoot
-xtermRoot           = XTermRoot
-                        . setA progBin "xterm"
-                        . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at -t root"]
-                        $ defaultProgram
+xtermRoot           = XTermRoot xterm
 
 newtype Firefox     = Firefox Program
   deriving (Eq, Show, Read, Typeable)
@@ -297,6 +302,10 @@ myKeys XConfig {modMask = m} =
       --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
       -- Programs.
+      -- Use Program `xterm` value to determine which terminal to launch
+      -- instead of XConfig 'terminal' record.
+      , ( (m .|. shiftMask, xK_Return)
+        , spawn' (viewA progBin xterm) (viewA progArgs xterm))
       , ( (m .|. shiftMask, xK_f)
         , spawn "exec firefox -no-remote -ProfileManager")
       -- Audio keys.
