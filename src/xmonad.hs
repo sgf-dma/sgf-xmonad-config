@@ -11,7 +11,6 @@ import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import qualified Data.Map as M
 import Data.Monoid
 import Control.Applicative
 import System.Process
@@ -26,6 +25,9 @@ import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
+import Sgf.XMonad.Util.Run
+import Sgf.XMonad.Trace
+import Sgf.XMonad.Focus
 
 main :: IO ()
 main                = withHelper main_0
@@ -33,9 +35,10 @@ main                = withHelper main_0
 main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
-    let xcf = handleFullscreen
+    let xcf = handleFocus (Just (0, xK_a)) myFocusHook
+                . handleFullscreen
                 . handleDocks (Just (0, xK_b))
-                . handleProgs (Just (0, xK_s)) (myPrograms ++ myDocks)
+                . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
                 $ defaultConfig
                     {
@@ -44,8 +47,16 @@ main_0              = do
                     workspaces = map show [1..9] ++ ["lock"]
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
-                    , terminal = "xterm -fg black -bg white"
-                    --, logHook = myTrace
+                    -- Do not set terminal here: edit `xterm` value instead.
+                    -- Because proper conversion from Program to String (and
+                    -- back) should be done with respect to shell escaping
+                    -- rules, it's simpler to just redefine 'mod+shift+enter'
+                    -- to use Program value (`xterm`). I set terminal here,
+                    -- though, to make it roughly match to `xterm` value and
+                    -- to avoid conversion issues i just throw away all
+                    -- arguments: at least it's safe..
+                    , terminal = viewA progBin xterm
+                    --, logHook = traceWindowSet
                     }
     handleVnc xcf >>= xmonad
 
@@ -60,6 +71,20 @@ handleFullscreen cf = cf
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
 
+-- FocusHook-s for different programs.
+myFocusHook :: [FocusHook]
+myFocusHook         = sequence [gmrunFocus, firefoxPassword]
+                        defaultFocusHook
+  where
+    -- gmrun takes focus from others *and* keeps it.
+    gmrunFocus :: FocusHook -> FocusHook
+    gmrunFocus      = setA newWindow (className =? "Gmrun")
+                        . setA focusedWindow (className =? "Gmrun")
+    -- Firefox password manager prompt keeps focus (unless overwritten by e.g.
+    -- gmrun).
+    firefoxPassword :: FocusHook -> FocusHook
+    firefoxPassword = setA focusedWindow (title =? "Password Required")
+
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
@@ -69,6 +94,7 @@ myPrograms          = [ addProg feh
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
+                      , addProg wpagui
                       ]
 
 -- Session with instant messengers.
@@ -90,7 +116,7 @@ sessionKeys         = [(0, xK_s), sessionIMKey]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        $ defaultXmobar
+                        defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
@@ -122,6 +148,7 @@ trayer              = Trayer $ setA progBin "trayer"
                             , "--transparent", "true" , "--tint", "0x191970"
                             , "--height", "12"
                             ]
+                        . setA progWait 300000
                         $ defaultProgram
 
 -- END Docks }}}
@@ -150,6 +177,10 @@ feh                 = Feh   $ setA progBin "/bin/sh"
                             . setA progArgs ["-c", ""]
                             $ defaultProgram
 
+-- Program used as terminal.
+xterm :: Program
+xterm               = setA progBin "xterm" defaultProgram
+
 -- User terminal.
 newtype XTermUser   = XTermUser Program
   deriving (Eq, Show, Read, Typeable)
@@ -163,11 +194,7 @@ instance RestartClass XTermUser where
     manageP (XTermUser _)   = doShift "2"
     launchKey               = const ((0, xK_x) : sessionKeys)
 xtermUser :: XTermUser
-xtermUser           = XTermUser
-                        . setA progBin "xterm"
-                        . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at -t main"]
-                        $ defaultProgram
+xtermUser           = XTermUser xterm
 
 -- Root terminal.
 newtype XTermRoot   = XTermRoot Program
@@ -180,13 +207,9 @@ instance ProcessClass XTermRoot where
 instance RestartClass XTermRoot where
     runP (XTermRoot x)      = XTermRoot <$> runP x
     manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const ((0, xK_x) : sessionKeys)
+    launchKey               = const ((shiftMask, xK_x) : sessionKeys)
 xtermRoot :: XTermRoot
-xtermRoot           = XTermRoot
-                        . setA progBin "xterm"
-                        . setA progArgs ["-fg", "black", "-bg", "white"
-                                        , "-e", "tmux at -t root"]
-                        $ defaultProgram
+xtermRoot           = XTermRoot xterm
 
 newtype Firefox     = Firefox Program
   deriving (Eq, Show, Read, Typeable)
@@ -249,19 +272,25 @@ instance RestartClass XClock where
 xclock :: XClock
 xclock          = XClock $ setA progBin "xclock" defaultProgram
 
+newtype WpaGui      = WpaGui Program
+  deriving (Eq, Show, Read, Typeable)
+instance Monoid WpaGui where
+    (WpaGui x) `mappend` (WpaGui y) = WpaGui (x `mappend` y)
+    mempty          = WpaGui mempty
+instance ProcessClass WpaGui where
+    pidL f (WpaGui x)   = WpaGui <$> pidL f x
+instance RestartClass WpaGui where
+    runP (WpaGui x)     = WpaGui <$> runP x
+wpagui :: WpaGui
+wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
+
 -- END programs }}}
 
--- Print some information.
-myTrace :: X ()
-myTrace             = do
-    withWindowSet $ \ws -> do
-      whenJust (W.stack . W.workspace . W.current $ ws) $ \s -> do
-        ts <- mapM (runQuery title) (W.integrate s)
-        trace "Tiled windows:"
-        trace (show ts)
-      trace "Floating windows:"
-      fs <- mapM (runQuery title) (M.keys . W.floating $ ws)
-      trace (show fs)
+-- Some debug traces.
+
+-- Log programs stored in Extensible State.
+tracePrograms :: X ()
+tracePrograms       = do
     trace "Tracked programs:"
     traceP xtermUser
     traceP xtermRoot
@@ -283,6 +312,10 @@ myKeys XConfig {modMask = m} =
       --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
       -- Programs.
+      -- Use Program `xterm` to determine which terminal to launch instead of
+      -- XConfig 'terminal' record.
+      , ( (m .|. shiftMask, xK_Return)
+        , spawn' (viewA progBin xterm) (viewA progArgs xterm))
       , ( (m .|. shiftMask, xK_f)
         , spawn "exec firefox -no-remote -ProfileManager")
       -- Audio keys.
