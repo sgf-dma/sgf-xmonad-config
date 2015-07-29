@@ -116,7 +116,7 @@ sessionKeys         = [(0, xK_s), sessionIMKey]
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
 xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        $ defaultXmobar
+                        defaultXmobar
   where
     t :: String -> String
     t               = xmobarColor "green" "" . shorten 50
@@ -179,7 +179,7 @@ feh                 = Feh   $ setA progBin "/bin/sh"
 
 -- Program used as terminal.
 xterm :: Program
-xterm               = setA progBin "xterm" $ defaultProgram
+xterm               = setA progBin "xterm" defaultProgram
 
 -- User terminal.
 newtype XTermUser   = XTermUser Program
