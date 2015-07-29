@@ -27,6 +27,7 @@ import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Util.Run
 import Sgf.XMonad.Trace
+import Sgf.XMonad.Focus
 
 main :: IO ()
 main                = withHelper main_0
@@ -34,7 +35,8 @@ main                = withHelper main_0
 main_0 :: IO ()
 main_0              = do
     -- FIXME: Spawn process directly, not through shell.
-    let xcf = handleFullscreen
+    let xcf = handleFocus (Just (0, xK_a)) myFocusHook
+                . handleFullscreen
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
@@ -54,7 +56,6 @@ main_0              = do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
-                    , manageHook = noGrabFocus
                     --, logHook = traceWindowSet
                     }
     handleVnc xcf >>= xmonad
@@ -70,10 +71,19 @@ handleFullscreen cf = cf
     , handleEventHook   = fullscreenEventHook <+> handleEventHook cf
     }
 
--- Do not grab window focus for all windows, except launcher (`gmrun`).
-noGrabFocus :: ManageHook
-noGrabFocus         = not <$> className =? "Gmrun" -->
-                        return (Endo W.focusDown)
+-- FocusHook-s for different programs.
+myFocusHook :: [FocusHook]
+myFocusHook         = sequence [gmrunFocus, firefoxPassword]
+                        defaultFocusHook
+  where
+    -- gmrun takes focus from others *and* keeps it.
+    gmrunFocus :: FocusHook -> FocusHook
+    gmrunFocus      = setA newWindow (className =? "Gmrun")
+                        . setA focusedWindow (className =? "Gmrun")
+    -- Firefox password manager prompt keeps focus (unless overwritten by e.g.
+    -- gmrun).
+    firefoxPassword :: FocusHook -> FocusHook
+    firefoxPassword = setA focusedWindow (title =? "Password Required")
 
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
@@ -302,8 +312,8 @@ myKeys XConfig {modMask = m} =
       --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
       -- Programs.
-      -- Use Program `xterm` value to determine which terminal to launch
-      -- instead of XConfig 'terminal' record.
+      -- Use Program `xterm` to determine which terminal to launch instead of
+      -- XConfig 'terminal' record.
       , ( (m .|. shiftMask, xK_Return)
         , spawn' (viewA progBin xterm) (viewA progArgs xterm))
       , ( (m .|. shiftMask, xK_f)
