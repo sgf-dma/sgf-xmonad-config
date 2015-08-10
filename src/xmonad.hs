@@ -9,6 +9,7 @@ import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
+import XMonad.Hooks.ManageHelpers (isDialog)
 
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
 import Data.Monoid
@@ -80,10 +81,12 @@ myFocusHook         = sequence [gmrunFocus, firefoxPassword]
     gmrunFocus :: FocusHook -> FocusHook
     gmrunFocus      = setA newWindow (className =? "Gmrun")
                         . setA focusedWindow (className =? "Gmrun")
-    -- Firefox password manager prompt keeps focus (unless overwritten by e.g.
-    -- gmrun).
+    -- Firefox dialog prompts (e.g. password manager prompt) keep focus
+    -- (unless overwritten by e.g. gmrun).
     firefoxPassword :: FocusHook -> FocusHook
-    firefoxPassword = setA focusedWindow (title =? "Password Required")
+    firefoxPassword = setA focusedWindow $
+                        (className =? "Iceweasel" <||> className =? "Firefox")
+                        <&&> isDialog
 
 myDocks :: LayoutClass l Window => [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
@@ -95,6 +98,7 @@ myPrograms          = [ addProg feh
                       , addProg skype
                       , addProg pidgin
                       , addProg wpagui
+                      , addProg xclock
                       ]
 
 -- Session with instant messengers.
@@ -269,6 +273,9 @@ instance ProcessClass XClock where
 instance RestartClass XClock where
     runP (XClock x)     = XClock <$> runP x
     manageP (XClock _)  = doShift "7"
+    launchAtStartup     = const False
+    launchKey           = const [(shiftMask, xK_d), sessionIMKey]
+    doLaunchP           = restartP
 xclock :: XClock
 xclock          = XClock $ setA progBin "xclock" defaultProgram
 
