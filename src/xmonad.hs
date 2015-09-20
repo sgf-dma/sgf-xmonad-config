@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 import XMonad
 import XMonad.Layout.NoBorders
@@ -11,22 +10,21 @@ import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
 
+import Control.Monad
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import Data.Monoid
 import Control.Applicative
 import System.Process
 
-import System.FilePath
-import System.Directory
-import Codec.Binary.UTF8.String (encodeString) 
-
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
+import Sgf.XMonad.Restartable.Firefox
+import Sgf.XMonad.Restartable.Feh
+import Sgf.XMonad.Restartable.XTerm
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
+import Sgf.XMonad.Docks.Trayer
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
-import Sgf.XMonad.Util.Run
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 
@@ -97,7 +95,6 @@ myPrograms          = [ addProg feh
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
-                      , addProg wpagui
                       , addProg xclock
                       ]
 
@@ -126,171 +123,71 @@ xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
     t               = xmobarColor "green" "" . shorten 50
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
-xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
+xmobarAlt           = setA (xmobarProg . progArgs . xmobarConf) ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
                         $ defaultXmobar
 
-newtype Trayer      = Trayer Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Trayer where
-    (Trayer x) `mappend` (Trayer y) = Trayer (x `mappend` y)
-    mempty          = Trayer mempty
-instance ProcessClass Trayer where
-    pidL f (Trayer x)   = Trayer <$> pidL f x
-instance RestartClass Trayer where
-    runP (Trayer x)     = Trayer <$> runP x
-    doLaunchP           = restartP
-instance DockClass Trayer where
-
 trayer :: Trayer
-trayer              = Trayer $ setA progBin "trayer"
-                        . setA progArgs
-                            [ "--edge", "top", "--align", "right"
-                            , "--SetDockType", "true"
-                            , "--SetPartialStrut", "true"
-                            , "--expand", "true", "--width", "10"
-                            , "--transparent", "true" , "--tint", "0x191970"
-                            , "--height", "12"
-                            ]
-                        . setA progWait 300000
-                        $ defaultProgram
+trayer              = setA (trayerProg . progWait) 300000
+                        . modifyA (trayerProg . progArgs . trayerArgs)
+                          (++ [ "--edge", "top", "--align", "right"
+                              , "--width", "10", "--height", "12"
+                              , "--transparent", "true" , "--tint", "0x191970"
+                              , "--expand", "true"
+                              ])
+                        $ defaultTrayer
 
 -- END Docks }}}
 -- Programs {{{
 
--- Use `xsetroot -grey`, if no .fehbg found.
-newtype Feh         = Feh Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Feh where
-    (Feh x) `mappend` (Feh y) = Feh (x `mappend` y)
-    mempty          = Feh mempty
-instance ProcessClass Feh where
-    pidL f (Feh x)  = Feh <$> pidL f x
-instance RestartClass Feh where
-    runP (Feh x)    = do
-        cmd <- liftIO $ do
-          h <- getHomeDirectory
-          let f = h </> ".fehbg"
-          b <- doesFileExist f
-          if b
-            then readFile f
-            else return "xsetroot -grey"
-        Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
+-- Will use `xsetroot -grey`, if no .fehbg found.
 feh :: Feh
-feh                 = Feh   $ setA progBin "/bin/sh"
-                            . setA progArgs ["-c", ""]
-                            $ defaultProgram
+feh                 = defaultFeh
 
--- Program used as terminal.
-xterm :: Program
-xterm               = setA progBin "xterm" defaultProgram
+-- With such definition, `xterm == xtermUser`, but that should not matter,
+-- because 'xterm' launched untracked using `runP` (and, thus,  should not
+-- appear in Extensible State).
+xterm :: XTerm
+xterm               = defaultXTerm
+xtermUser :: XTerm
+xtermUser           = setA progWorkspace "2"
+                        . setA progLaunchKey ((0, xK_x) : sessionKeys)
+                        $ defaultXTerm
+-- In fact, title "root" will be immediately overwritten by shell. But for
+-- xmonad values 'xtermUser' and 'xtermRoot' will no longer equal.
+xtermRoot :: XTerm
+xtermRoot           = setA progWorkspace "3"
+                        . setA (progArgs . xtermTitle) "root"
+                        . setA progLaunchKey ((shiftMask, xK_x) : sessionKeys)
+                        $ defaultXTerm
 
--- User terminal.
-newtype XTermUser   = XTermUser Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XTermUser where
-    (XTermUser x) `mappend` (XTermUser y) = XTermUser (x `mappend` y)
-    mempty          = XTermUser mempty
-instance ProcessClass XTermUser where
-    pidL f (XTermUser x)    = XTermUser <$> pidL f x
-instance RestartClass XTermUser where
-    runP (XTermUser x)      = XTermUser <$> runP x
-    manageP (XTermUser _)   = doShift "2"
-    launchKey               = const ((0, xK_x) : sessionKeys)
-xtermUser :: XTermUser
-xtermUser           = XTermUser xterm
-
--- Root terminal.
-newtype XTermRoot   = XTermRoot Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XTermRoot where
-    (XTermRoot x) `mappend` (XTermRoot y) = XTermRoot (x `mappend` y)
-    mempty          = XTermRoot mempty
-instance ProcessClass XTermRoot where
-    pidL f (XTermRoot x)    = XTermRoot <$> pidL f x
-instance RestartClass XTermRoot where
-    runP (XTermRoot x)      = XTermRoot <$> runP x
-    manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const ((shiftMask, xK_x) : sessionKeys)
-xtermRoot :: XTermRoot
-xtermRoot           = XTermRoot xterm
-
-newtype Firefox     = Firefox Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Firefox where
-    (Firefox x) `mappend` (Firefox y) = Firefox (x `mappend` y)
-    mempty          = Firefox mempty
-instance ProcessClass Firefox where
-    pidL f (Firefox x)  = Firefox <$> pidL f x
-instance RestartClass Firefox where
-    runP (Firefox x)    = Firefox <$> runP x
-    manageP (Firefox _) = doShift "1"
-    launchAtStartup     = const False
-    launchKey           = const ((0, xK_f) : sessionKeys)
 firefox :: Firefox
-firefox             = Firefox
-                        . setA progBin "firefox"
+firefox             = setA progStartup False
+                        . setA progWorkspace "1"
+                        . setA progLaunchKey ((0, xK_f) : sessionKeys)
+                        . setA (progArgs . firefoxProfile) "sgf"
+                        $ defaultFirefox
+
+skype :: Program NoArgs
+skype               = setA progBin "skype"
+                        . setA progStartup False
+                        . setA progWorkspace "4"
+                        . setA progLaunchKey [(0, xK_i), sessionIMKey]
                         $ defaultProgram
 
-newtype Skype       = Skype Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Skype where
-    (Skype x) `mappend` (Skype y) = Skype (x `mappend` y)
-    mempty          = Skype mempty
-instance ProcessClass Skype where
-    pidL f (Skype x)    = Skype <$> pidL f x
-instance RestartClass Skype where
-    runP (Skype x)      = Skype <$> runP x
-    manageP (Skype _)   = doShift "4"
-    launchAtStartup     = const False
-    launchKey           = const [(0, xK_i), sessionIMKey]
-skype :: Skype
-skype               = Skype $ setA progBin "skype" defaultProgram
+pidgin :: Program NoArgs
+pidgin              = setA progBin "pidgin"
+                        . setA progStartup False
+                        . setA progWorkspace "4"
+                        . setA progLaunchKey [(shiftMask, xK_i) , sessionIMKey]
+                        $ defaultProgram
 
-newtype Pidgin      = Pidgin Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Pidgin where
-    (Pidgin x) `mappend` (Pidgin y) = Pidgin (x `mappend` y)
-    mempty          = Pidgin mempty
-instance ProcessClass Pidgin where
-    pidL f (Pidgin x)   = Pidgin <$> pidL f x
-instance RestartClass Pidgin where
-    runP (Pidgin x)     = Pidgin <$> runP x
-    manageP (Pidgin _)  = doShift "4"
-    launchAtStartup     = const False
-    launchKey           = const [(shiftMask, xK_i), sessionIMKey]
-pidgin :: Pidgin
-pidgin              = Pidgin $ setA progBin "pidgin" defaultProgram
-
--- Just for testing.
-newtype XClock      = XClock Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XClock where
-    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
-    mempty          = XClock mempty
-instance ProcessClass XClock where
-    pidL f (XClock x)   = XClock <$> pidL f x
-instance RestartClass XClock where
-    runP (XClock x)     = XClock <$> runP x
-    manageP (XClock _)  = doShift "7"
-    launchAtStartup     = const False
-    launchKey           = const [(shiftMask, xK_d), sessionIMKey]
-    doLaunchP           = restartP
-xclock :: XClock
-xclock          = XClock $ setA progBin "xclock" defaultProgram
-
-newtype WpaGui      = WpaGui Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid WpaGui where
-    (WpaGui x) `mappend` (WpaGui y) = WpaGui (x `mappend` y)
-    mempty          = WpaGui mempty
-instance ProcessClass WpaGui where
-    pidL f (WpaGui x)   = WpaGui <$> pidL f x
-instance RestartClass WpaGui where
-    runP (WpaGui x)     = WpaGui <$> runP x
-wpagui :: WpaGui
-wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
-
+xclock :: Program NoArgs
+xclock              = setA progBin "xclock"
+                        . setA progStartup False
+                        . setA progWorkspace "7"
+                        . setA progLaunchKey [(shiftMask, xK_d), sessionIMKey]
+                        $ defaultProgram
 -- END programs }}}
 
 -- Some debug traces.
@@ -299,11 +196,15 @@ wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
 tracePrograms :: X ()
 tracePrograms       = do
     trace "Tracked programs:"
+    traceP xmobar
+    --traceP feh
+    --traceP firefox
+{-
     traceP xtermUser
     traceP xtermRoot
     traceP xmobar
     traceP trayer
-    traceP feh
+-}
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
@@ -321,8 +222,7 @@ myKeys XConfig {modMask = m} =
       -- Programs.
       -- Use Program `xterm` to determine which terminal to launch instead of
       -- XConfig 'terminal' record.
-      , ( (m .|. shiftMask, xK_Return)
-        , spawn' (viewA progBin xterm) (viewA progArgs xterm))
+      , ( (m .|. shiftMask, xK_Return), void (runP xterm))
       , ( (m .|. shiftMask, xK_f)
         , spawn "exec firefox -no-remote -ProfileManager")
       -- Audio keys.
