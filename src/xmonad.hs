@@ -29,10 +29,7 @@ import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 
 main :: IO ()
-main                = withHelper main_0
-
-main_0 :: IO ()
-main_0              = do
+main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFocus (Just (0, xK_a)) myFocusHook
                 . handleFullscreen
