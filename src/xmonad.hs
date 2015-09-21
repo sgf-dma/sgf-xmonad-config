@@ -53,6 +53,7 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
+                    , clickJustFocuses = False
                     }
     handleVnc xcf >>= xmonad
 
