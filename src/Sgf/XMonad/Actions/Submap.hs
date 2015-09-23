@@ -1,3 +1,17 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  XMonad.Actions.Submap
+-- Copyright   :  (c) Jason Creighton <jcreigh@gmail.com>
+-- License     :  BSD3-style (see LICENSE)
+--
+-- Maintainer  :  Jason Creighton <jcreigh@gmail.com>
+-- Stability   :  unstable
+-- Portability :  unportable
+--
+-- A module that allows the user to create a sub-mapping of key bindings.
+--
+-----------------------------------------------------------------------------
+
 module Sgf.XMonad.Actions.Submap (
                              -- * Usage
                              -- $usage
@@ -48,20 +62,19 @@ submap keys = submapDefault (return ()) keys
 
 -- | Like 'submap', but executes a default action if the key did not match.
 submapDefault :: X () -> M.Map (KeyMask, KeySym) (X ()) -> X ()
-submapDefault def keys = do
+submapDefault defAction keys = do
     XConf { theRoot = root, display = d } <- ask
 
     io $ grabKeyboard d root False grabModeAsync grabModeAsync currentTime
-    io $ grabPointer d root False buttonPressMask grabModeSync grabModeAsync none none currentTime
+    io $ grabPointer d root False buttonPressMask grabModeAsync grabModeAsync
+                     none none currentTime
 
     (m, s) <- io $ allocaXEvent $ \p -> fix $ \nextkey -> do
         maskEvent d (keyPressMask .|. buttonPressMask) p
-        --KeyEvent { ev_keycode = code, ev_state = m } <- getEvent p
         ev <- getEvent p
         case ev of
           KeyEvent { ev_keycode = code, ev_state = m } -> do
             keysym <- keycodeToKeysym d code 0
-            trace $ "AAA: " ++ show keysym ++ ", " ++ show (isModifierKey keysym)
             if isModifierKey keysym
                 then nextkey
                 else return (m, keysym)
@@ -72,5 +85,4 @@ submapDefault def keys = do
     io $ ungrabPointer d currentTime
     io $ ungrabKeyboard d currentTime
 
-    maybe def id (M.lookup (m', s) keys)
-
+    maybe defAction id (M.lookup (m', s) keys)
