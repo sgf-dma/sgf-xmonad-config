@@ -28,6 +28,9 @@ import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 
+import Sgf.XMonad.Actions.Submap
+import qualified Data.Map as M
+
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
@@ -223,6 +226,7 @@ myKeys XConfig {modMask = m} =
       , ( (m .|. shiftMask, xK_Return), void (runP xterm))
       , ( (m .|. shiftMask, xK_f)
         , spawn "exec firefox -no-remote -ProfileManager")
+      , ( (m , xK_d), submap . M.fromList $ [((0, xK_a), spawn "xclock"), ((0, xK_b), spawn "xterm")])
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
       -- FIXME: This really not exactly what i want. I want, that if sound is
