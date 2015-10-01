@@ -9,6 +9,7 @@ import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
+import XMonad.Hooks.DynamicLog (PP)
 
 import Control.Monad
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
@@ -52,7 +53,7 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
-                    --, logHook = traceWindowSet
+                    --, logHook = traceAllWindows
                     , clickJustFocuses = False
                     }
     handleVnc xcf >>= xmonad
@@ -114,11 +115,15 @@ sessionKeys         = [(0, xK_s), sessionIMKey]
 -- .
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
-xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        defaultXmobar
+xmobar              = setA xmobarPP (Just xp) defaultXmobar
   where
-    t :: String -> String
-    t               = xmobarColor "green" "" . shorten 50
+    xp :: PP
+    xp              = setA ppTitleL pt . setA ppHiddenL ph $ defaultXmobarPP
+    pt :: String -> String
+    pt              = xmobarColor "green" "" . shorten 50
+    ph :: WorkspaceId -> String
+    ph w            = "<action=`xdotool key super+" ++ w ++ "`>"
+                        ++ w ++ "</action>"
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
 xmobarAlt           = setA (xmobarProg . progArgs . xmobarConf) ".xmobarrcAlt"
