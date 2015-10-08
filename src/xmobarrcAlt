@@ -1,10 +1,10 @@
 Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
        , bgColor = "grey"
        , fgColor = "black"
-       , position = TopW L 90
-       , overrideRedirect = True
-       , commands = [ Run MultiCpu ["-p", "3", "-S", "True", "-t", "<autototal>", "-L","10","-H","80","-n","blue","-h","red"] 10
-		    , Run CoreTemp ["-t", "<core0>C/<core1>C", "-L", "20", "-H", "90", "-n", "blue", "-h", "red"] 10
+       , position = Bottom
+       , overrideRedirect = False
+       , commands = [ Run MultiCpu ["-p", "3", "-S", "True", "-t", "<autototal>", "-L","10","-H","70","-n","blue","-h","red"] 10
+		    , Run CoreTemp ["-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
 		    , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
                     , Run Memory ["-p", "3", "-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
                     , Run Swap ["-p", "3", "-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
@@ -17,5 +17,5 @@ Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
                     ]
        , sepChar = "%"
        , alignSep = "}{"
-       , template = "%StdinReader% } %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork%, %wlan0wi% * %battery% "
+       , template = "} %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork%, %wlan0wi% * %battery% "
        }
