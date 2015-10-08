@@ -3,7 +3,7 @@ Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
        , fgColor = "black"
        , position = TopW L 90
        , overrideRedirect = False
-       , commands = [ Run MultiCpu ["-p", "3", "-t", "<total0>%/<total1>%", "-L","10","-H","70","-n","blue","-h","red"] 10
+       , commands = [ Run MultiCpu ["-p", "3", "-S", "True", "-t", "<autototal>", "-L","10","-H","70","-n","blue","-h","red"] 10
 		    , Run CoreTemp ["-p", "3", "-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
 		    , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
                     , Run Memory ["-p", "3", "-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
