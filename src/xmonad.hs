@@ -29,6 +29,9 @@ import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 
+import qualified Data.Map as M
+import XMonad.Hooks.ManageDocks
+
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
@@ -53,10 +56,38 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
-                    --, logHook = traceAllWindows
+                    , logHook = traceAllWindows  -- >> lh
+                    -- , manageHook = -- traceNew >> traceFloat --  >> checkDock --> doFloat
+                    -- , layoutHook = avoidStruts (layoutHook defaultConfig)
                     , clickJustFocuses = False
                     }
     handleVnc xcf >>= xmonad
+
+lh :: X ()
+lh                  = withWindowSet $ \ws -> do
+     let allscreens = W.screens ws
+         summed_visible = scanl (++) [] $ map (W.integrate' . W.stack . W.workspace) allscreens
+     trace $ "AAAA: " ++ show summed_visible
+     forM_ (zip allscreens summed_visible) $ \ (w, vis) -> do
+        let wsp   = W.workspace w
+            this  = W.view n ws
+            n     = W.tag wsp
+            tiled = (W.stack . W.workspace . W.current $ this)
+                    >>= W.filter (`M.notMember` W.floating ws)
+                    >>= W.filter (`notElem` vis)
+        trace $ "CCCC: " ++ show vis
+        trace $ "BBBB: " ++ show tiled
+
+qTree :: X ()
+qTree               = withDisplay $ \d -> do
+    rw <- asks theRoot
+    (r, p, cs) <- io $ queryTree d rw
+    rs <- showWindow r
+    trace $ "Root window: " ++ rs
+    ps <- showWindow p
+    trace $ "Parent window: " ++ ps
+    xs <- mapM showWindow cs
+    trace $ "Child windows: " ++ show xs
 
 -- Modify layoutHook to remove borders around floating windows covering whole
 -- screen and around tiled windows in non-ambiguous cases. Also, add event
@@ -219,8 +250,8 @@ myKeys XConfig {modMask = m} =
       , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
       -- For testing two screens.
-      --, ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
-      --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
+      , ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
+      , ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
 
       -- Programs.
       -- Use Program `xterm` to determine which terminal to launch instead of
@@ -235,7 +266,42 @@ myKeys XConfig {modMask = m} =
       , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
                                                  ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
+      --, ((m, xK_d), refresh)
+      , ((m, xK_d), refreshAllWorkspaces)
       ]
+      ++ [((m .|. t, k), windows $ f i)
+           | (i, k) <- zip (map show [1..9]) [xK_1 .. xK_9]
+           , (f, t) <- [(W.view, 0), (W.shift, shiftMask)]]
+
+refreshDock :: X ()
+refreshDock         = withDisplay $ \d -> do
+    mw <- gets (W.peek . windowset)
+    trace $ "Raise " ++ show mw
+    whenJust mw $ \w -> do
+      io $ raiseWindow d w
+      refresh
+
+refreshAllWorkspaces :: X ()
+refreshAllWorkspaces    = withWindowSet (mapM_ refreshWorkspace . W.workspaces)
+refreshWorkspace :: W.Workspace WorkspaceId l a -> X ()
+refreshWorkspace wsp = withDisplay $ \d -> do
+    let n = W.tag wsp
+    mw <- gets (W.peek . W.view n . windowset)
+    trace $ "Raise " ++ show mw
+    whenJust mw $ \w -> do
+      io $ raiseWindow d w
+      refresh
+
+refreshAllWorkspaces2 :: X ()
+refreshAllWorkspaces2   = withWindowSet (mapM_ refreshWorkspace2 . W.workspaces)
+refreshWorkspace2 :: W.Workspace WorkspaceId l a -> X ()
+refreshWorkspace2 wsp = withDisplay $ \d -> do
+    let n = W.tag wsp
+    mw <- gets (W.peek . W.view n . windowset)
+    trace $ "Raise " ++ show mw
+    whenJust mw $ \w -> do
+      io $ raiseWindow d w
+      refresh
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
