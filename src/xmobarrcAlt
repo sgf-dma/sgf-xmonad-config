@@ -3,17 +3,17 @@ Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
        , fgColor = "black"
        , position = Bottom
        , overrideRedirect = False
-       , commands = [ Run MultiCpu ["-t", "<total0>%/<total1>%", "-L","10","-H","70","-n","blue","-h","red"] 10
-		    , Run CoreTemp ["-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
-		    , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
-                    , Run Memory ["-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
-                    , Run Swap ["-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
+       , commands = [ Run MultiCpu ["-p", "3", "-S", "True", "-t", "<autototal>", "-L","10","-H","70","-n","blue","-h","red"] 10
+                    , Run CoreTemp ["-p", "3", "-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
+                    , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
+                    , Run Memory ["-p", "3", "-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
+                    , Run Swap ["-p", "3", "-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
                     , Run Com "date" ["+%a%_d%b %_H:%M"] "extdate" 10
                     , Run StdinReader
-		    , Run Kbd [("us", "US"), ("ru", "RU")]
-		    , Run BatteryP ["AC", "BAT0"] ["-t", "<acstatus>", "-L", "30", "-H", "90", "-l", "red", "-n", "blue", "--", "-O", "AC: <left>%/<timeleft>", "-i", "AC", "-o", "<fc=blue>Batt:</fc> <left>%/<timeleft>"] 10
-		    , Run Wireless "wlan0" ["-t", "<quality>", "-L", "40", "-H", "70", "-l", "red", "-n", "blue"] 10
-		    , Run DynNetwork ["-t", "<dev>: <rx>KB/<tx>KB"] 10
+                    , Run Kbd [("us", "US"), ("ru", "RU")]
+                    , Run BatteryP ["AC", "BAT0"] ["-p", "3", "-t", "<acstatus>", "-L", "30", "-H", "90", "-l", "red", "-n", "blue", "--", "-O", "AC: <left>%/<timeleft>", "-i", "AC", "-o", "<fc=blue>Batt:</fc> <left>%/<timeleft>"] 10
+                    , Run Wireless "wlan0" ["-m", "3", "-t", "<quality>", "-L", "40", "-H", "70", "-l", "red", "-n", "blue"] 10
+                    , Run DynNetwork ["-m", "3", "-t", "<dev>: <rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
        , alignSep = "}{"
