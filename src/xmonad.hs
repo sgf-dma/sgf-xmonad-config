@@ -29,6 +29,8 @@ import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 
+import XMonad.Hooks.ServerMode
+
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
@@ -54,6 +56,7 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
                     --, logHook = traceAllWindows
+                    , handleEventHook = serverModeEventHook
                     , clickJustFocuses = False
                     }
     handleVnc xcf >>= xmonad
