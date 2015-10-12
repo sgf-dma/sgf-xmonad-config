@@ -227,7 +227,7 @@ myKeys XConfig {modMask = m} =
       -- XConfig 'terminal' record.
       , ( (m .|. shiftMask, xK_Return), void (runP xterm))
       , ( (m .|. shiftMask, xK_f)
-        , spawn "exec firefox -no-remote -ProfileManager")
+        , spawn "exec firefox --new-instance -ProfileManager")
       -- Audio keys.
       , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
       -- FIXME: This really not exactly what i want. I want, that if sound is
