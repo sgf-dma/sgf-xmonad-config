@@ -266,8 +266,7 @@ myKeys XConfig {modMask = m} =
       , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
                                                  ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
-      --, ((m, xK_d), refresh)
-      , ((m, xK_d), refreshAllWorkspaces)
+      , ((m, xK_d), raiseGmrun )
       ]
       ++ [((m .|. t, k), windows $ f i)
            | (i, k) <- zip (map show [1..9]) [xK_1 .. xK_9]
@@ -302,6 +301,12 @@ refreshWorkspace2 wsp = withDisplay $ \d -> do
     whenJust mw $ \w -> do
       io $ raiseWindow d w
       refresh
+
+raiseGmrun :: X ()
+raiseGmrun          = withDisplay $ \d -> withWindowSet $ \ws ->
+    forM_ (W.index ws) $ \w -> do
+      b <- runQuery (className =? "Gmrun") w
+      when b (io $ raiseWindow d w)
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
