@@ -3,10 +3,10 @@
 ! http://ethanschoonover.com/solarized
 
 m4_changequote(`[', `]')m4_dnl
-
-m4_define([Light],[])m4_dnl
 m4_dnl Defaults to Dark.
-m4_ifdef([Light], [], [m4_define([Dark])])m4_dnl
+m4_ifdef([Light], [m4_undefine([Dark])], [m4_define([Dark])])m4_dnl
+m4_dnl Defaults to no prefix for X resources.
+m4_ifdef([pref], [], [m4_define([pref],[])])m4_dnl
 
 m4_dnl Common
 m4_define([S_yellow], [#b58900])m4_dnl
@@ -19,7 +19,7 @@ m4_define([S_cyan], [#2aa198])m4_dnl
 m4_define([S_green], [#859900])m4_dnl
 
 m4_dnl Dark
-m4_ifdef([Dark], [
+m4_ifdef([Dark], [[! Dark]
 m4_define([S_base03], [#002b36])m4_dnl
 m4_define([S_base02], [#073642])m4_dnl
 m4_define([S_base01], [#586e75])m4_dnl
@@ -29,9 +29,8 @@ m4_define([S_base1], [#93a1a1])m4_dnl
 m4_define([S_base2], [#eee8d5])m4_dnl
 m4_define([S_base3], [#fdf6e3])m4_dnl
 ])m4_dnl
-
 m4_dnl Light
-m4_ifdef([Light], [
+m4_ifdef([Light], [[! Light]
 m4_define([S_base03], [#fdf6e3])m4_dnl
 m4_define([S_base02], [#eee8d5])m4_dnl
 m4_define([S_base01], [#93a1a1])m4_dnl
@@ -47,28 +46,28 @@ m4_define([S_base3], [#002b36])m4_dnl
 !
 ! URxvt*background:            S_base03
 
-*background:              S_base03
-*foreground:              S_base0
-*fading:                  40
-*fadeColor:               S_base03
-*cursorColor:             S_base1
-*pointerColorBackground:  S_base01
-*pointerColorForeground:  S_base1
+pref*background:              S_base03
+pref*foreground:              S_base0
+pref*fading:                  40
+pref*fadeColor:               S_base03
+pref*cursorColor:             S_base1
+pref*pointerColorBackground:  S_base01
+pref*pointerColorForeground:  S_base1
 
-*color0:                  S_base02
-*color1:                  S_red
-*color2:                  S_green
-*color3:                  S_yellow
-*color4:                  S_blue
-*color5:                  S_magenta
-*color6:                  S_cyan
-*color7:                  S_base2
-*color9:                  S_orange
-*color8:                  S_base03
-*color10:                 S_base01
-*color11:                 S_base00
-*color12:                 S_base0
-*color13:                 S_violet
-*color14:                 S_base1
-*color15:                 S_base3
+pref*color0:                  S_base02
+pref*color1:                  S_red
+pref*color2:                  S_green
+pref*color3:                  S_yellow
+pref*color4:                  S_blue
+pref*color5:                  S_magenta
+pref*color6:                  S_cyan
+pref*color7:                  S_base2
+pref*color9:                  S_orange
+pref*color8:                  S_base03
+pref*color10:                 S_base01
+pref*color11:                 S_base00
+pref*color12:                 S_base0
+pref*color13:                 S_violet
+pref*color14:                 S_base1
+pref*color15:                 S_base3
 
