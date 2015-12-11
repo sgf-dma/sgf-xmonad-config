@@ -28,11 +28,15 @@ import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
+import Sgf.XMonad.Workspaces
+
+import Data.Monoid
 
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
     let xcf = handleFocus (Just (0, xK_a)) myFocusHook
+                . handleDefaultWorkspaces False (`elem` ["7"])
                 . handleFullscreen
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
@@ -53,7 +57,7 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
-                    --, logHook = traceAllWindows
+                    --, logHook = traceWindowSet
                     , clickJustFocuses = False
                     }
     handleVnc xcf >>= xmonad
