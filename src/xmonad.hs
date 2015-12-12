@@ -30,7 +30,7 @@ import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 import Sgf.XMonad.Workspaces
 
-import Data.Monoid
+import Data.Maybe
 
 main :: IO ()
 main                = withHelper $ do
@@ -59,6 +59,7 @@ main                = withHelper $ do
                     , terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
                     , clickJustFocuses = False
+                    , manageHook = manageLockWorkspace "lock"
                     }
     handleVnc xcf >>= xmonad
 
@@ -212,6 +213,22 @@ tracePrograms       = do
     traceP xmobar
     traceP trayer
 -}
+
+-- Moves away new window from "lock" workspace regardless of current workspace
+-- and focus.
+manageLockWorkspace :: WorkspaceId -> ManageHook
+manageLockWorkspace t   = ask >>= doF . lockWorkspace t
+
+lockWorkspace :: WorkspaceId -> Window -> WindowSet -> WindowSet
+lockWorkspace t w ws    = fromMaybe ws $ do
+    i <- W.findTag w ws
+    return $ if i == t
+      then W.shiftWin (anotherWorkspace t ws) w ws
+      else ws
+
+-- Which workspace to choose, when new window has assigned to lock workspace.
+anotherWorkspace :: WorkspaceId -> WindowSet -> WorkspaceId
+anotherWorkspace t      = head . filter (/= t) . map W.tag . W.workspaces
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
