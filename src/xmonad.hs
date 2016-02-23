@@ -29,6 +29,7 @@ import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
 import Sgf.XMonad.Workspaces
+import Sgf.XMonad.Layout.ShadowedWorkspaces
 
 import Data.Maybe
 
@@ -45,7 +46,7 @@ main                = withHelper $ do
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
-                    workspaces = ["~"] ++ map show [1..9] ++ ["lock"]
+                    workspaces = withShadows (["~"] ++ map show [1..9]) ++ ["lock"]
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     -- Do not set terminal here: edit `xterm` value instead.
@@ -233,7 +234,7 @@ anotherWorkspace t      = head . filter (/= t) . map W.tag . W.workspaces
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
 myKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
-myKeys XConfig {modMask = m} =
+myKeys cf@(XConfig {modMask = m}) =
       [ 
       --((m .|. shiftMask, xK_p), spawn "exec gmrun")
         ((m .|. shiftMask, xK_z), lock)
@@ -258,8 +259,8 @@ myKeys XConfig {modMask = m} =
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
       ]
       ++ [((m .|. t, k), windows $ f i)
-           | (i, k) <- zip (["~"] ++ map show [1..9]) (xK_grave : [xK_1 .. xK_9])
-           , (f, t) <- [(W.greedyView, 0), (W.shift, shiftMask)]]
+           | (i, k) <- zip (workspaces' cf) (xK_grave : [xK_1 .. xK_9])
+           , (f, t) <- [(shadowFunc W.greedyView, 0), (shadowFunc W.shift, shiftMask)]]
 
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
