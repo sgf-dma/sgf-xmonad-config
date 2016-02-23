@@ -45,7 +45,7 @@ main                = withHelper $ do
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
-                    workspaces = map show [1..9] ++ ["lock"]
+                    workspaces = ["~"] ++ map show [1..9] ++ ["lock"]
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     -- Do not set terminal here: edit `xterm` value instead.
@@ -257,6 +257,10 @@ myKeys XConfig {modMask = m} =
                                                  ++ "amixer set Master 1311+")
       , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
       ]
+      ++ [((m .|. t, k), windows $ f i)
+           | (i, k) <- zip (["~"] ++ map show [1..9]) (xK_grave : [xK_1 .. xK_9])
+           , (f, t) <- [(W.greedyView, 0), (W.shift, shiftMask)]]
+
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
