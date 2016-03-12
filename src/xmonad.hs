@@ -16,7 +16,6 @@ import Data.List
 
 import Control.Monad
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import Control.Applicative
 import System.Process
 
 import Sgf.Control.Lens
@@ -44,7 +43,7 @@ main                = withHelper $ do
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
-                $ defaultConfig
+                $ def
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
