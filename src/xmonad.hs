@@ -3,20 +3,18 @@
 import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
-import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
+import XMonad.Hooks.DynamicLog (PP, shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
-import XMonad.Hooks.DynamicLog (PP)
 import XMonad.Layout.ResizableTile
 
 import Data.List
 
 import Control.Monad
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import Control.Applicative
 import System.Process
 
 import Sgf.Control.Lens
@@ -44,7 +42,7 @@ main                = withHelper $ do
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
-                $ defaultConfig
+                $ def
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
