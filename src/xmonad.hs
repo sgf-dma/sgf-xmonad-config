@@ -10,6 +10,7 @@ import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
 import XMonad.Hooks.DynamicLog (PP)
+import XMonad.Layout.ResizableTile
 
 import Data.List
 
@@ -37,7 +38,7 @@ import Data.Maybe
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
-    let xcf = handleFocus (Just (0, xK_a)) myFocusHook
+    let xcf = handleFocus Nothing myFocusHook
                 . handleDefaultWorkspaces False (`elem` ["7"])
                 . handleFullscreen
                 . handleDocks (Just (0, xK_b))
@@ -62,8 +63,22 @@ main                = withHelper $ do
                     --, logHook = traceWindowSet
                     , clickJustFocuses = False
                     , manageHook = manageLockWorkspace "lock"
+                    , layoutHook = myLayout
                     }
     handleVnc xcf >>= xmonad
+
+myLayout    = tiled ||| Mirror tiled ||| Full
+  where
+    tiled :: ResizableTall Window
+    tiled = ResizableTall nmaster delta ratio slaves
+    nmaster :: Int
+    nmaster = 1
+    delta :: Rational
+    delta   = 3/100
+    ratio :: Rational
+    ratio   = 1/2
+    slaves :: [Rational]
+    slaves  = []
 
 -- Modify layoutHook to remove borders around floating windows covering whole
 -- screen and around tiled windows in non-ambiguous cases. Also, add event
@@ -257,6 +272,8 @@ myKeys XConfig {modMask = m} =
       -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
       , ((0,     xF86XK_AudioRaiseVolume), getDefaultSink >>= \s -> pulseVol VolOn s >> pulseVol VolUp s)
       , ((0,     xF86XK_AudioMute       ), getDefaultSink >>= pulseVol VolOff)
+      , ((m,  xK_a), sendMessage MirrorShrink)
+      , ((m,  xK_z), sendMessage MirrorExpand)
       ]
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
