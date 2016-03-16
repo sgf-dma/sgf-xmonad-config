@@ -17,14 +17,14 @@ executable xmonad
   hs-source-dirs:      src
   main-is:             xmonad.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
-  build-depends:       base >= 4.7 && < 5
-                     , process >= 1.1 && < 2
-                     , X11 >= 1.5 && < 2
-                     , xmonad >= 0.10 && < 1
-                     , xmonad-contrib >= 0.10 && < 1
-                     , xmonad-entryhelper == 0.1.*
-                     , sgf-xmonad-modules == 0.4.*
-                     , sgf-haskell-common == 0.1.*
+  build-depends:       base
+                     , process
+                     , X11
+                     , xmonad
+                     , xmonad-contrib
+                     , xmonad-entryhelper
+                     , sgf-xmonad-modules
+                     , sgf-haskell-common
   default-language:    Haskell2010
 
 --test-suite sgf-xmonad-config-test
