@@ -22,5 +22,8 @@ run_cmd wpa_gui
 xkb_ctrl_esc_to_super
 
 echo "Starting xmonad.."
+# Set additional directory for application-specific X resources loaded at each
+# application startup.
+export XAPPLRESDIR=~/.app-defaults
 exec ~/bin/xmonad
 

@@ -1,8 +1,3 @@
-xterm*termName: xterm-256color
-
-xterm*foreground: black
-xterm*background: white
-
 ! Use 'Large' font at start.
 xterm*initialFont: 5
 ! Or just set default font to font used as font5 ('Large' in "VT Fonts" menu)
