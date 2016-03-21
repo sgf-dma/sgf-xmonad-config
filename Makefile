@@ -27,18 +27,40 @@ install_dir	?= install -v -m 750 -d
 # scripts), but not for built files (m4).
 backup_install	?=
 
+# Arguments for building solarized.m4 .
+solarized_args	:= Dark Light pref
+
 src_dir		:= src
 build_dir	:= build
+
+appdefaults_dir		:= $(HOME)/.app-defaults
+xresources		:= XTerm Test
+installed_xresources	:= $(addprefix $(appdefaults_dir)/, $(xresources)) 
 
 xsession_dir		:= $(HOME)/.Xsession.d
 xsession		:= Xsession
 xsession_scripts	:= run_cmd.sh
 installed_xsession	:= $(HOME)/.Xsession $(addprefix $(xsession_dir)/, $(xsession_scripts))
 
-installed_files		:= $(installed_xsession)
+installed_files		:= $(installed_xresources) $(installed_xsession)
 
 
 ## Build.
+# Check is any of listed make variables are set, and, if so, return m4
+# command-line arguments setting corresponding m4 macroses to make variables
+# value,
+argv_m4 = $(foreach v,$(1),$(if $(value $(v)),-D $(v)=$(value $(v))))
+
+# I built solarized.m4 differently (with different prefix 'pref') for
+# different X resources.
+$(build_dir)/%-solarized : $(src_dir)/Xresources/solarized.m4
+	$(mkdir) $(dir $@)
+	m4 -P $(call argv_m4, $(solarized_args)) $< > $@
+
+$(build_dir)/% : $(src_dir)/%.m4
+	$(mkdir) $(dir $@)
+	m4 -P $(call argv_m4, $($(notdir $*)_args)) $< > $@
+
 # Warning: following implicit rules create intermediate files! See 10.4
 # "Chains of Implicit Rules". That means:
 # - If they (built files) don't exist, `make install` won't create them and
@@ -59,6 +81,18 @@ $(build_dir)/%.sh :: $(src_dir)/%.sh
 $(build_dir)/% :: $(src_dir)/%
 	$(mkdir) $(dir $@)
 	$(cp) $< $@
+
+$(build_dir)/Xresources/XTerm : pref ?= '*VT100'
+$(build_dir)/Xresources/XTerm : $(build_dir)/Xresources/XTerm-solarized
+	cat $(src_dir)/Xresources/XTerm $< > $@
+
+# Test build with different 'pref'.
+$(build_dir)/Xresources/Test : pref ?= '*VT'
+$(build_dir)/Xresources/Test : $(build_dir)/Xresources/Test-solarized
+	cat $< > $@
+
+.PHONY: Xresources
+Xresources : $(addprefix $(build_dir)/Xresources/, $(xresources))
 
 ## Install.
 # Generic install recipe, which checks whether file already exists and differs
@@ -83,12 +117,21 @@ define g_list_old_files
 )
 endef
 
+$(installed_xresources) : $(appdefaults_dir)/% : $(build_dir)/Xresources/%
+	$(call g_install, $(build_dir)/Xresources/$*)
+
 $(xsession_dir)/%.sh : $(build_dir)/%.sh
 	$(call g_install)
 # See above note about intermediate files.
 .INTERMEDIATE: $(build_dir)/$(xsession)
 $(HOME)/.Xsession : $(build_dir)/$(xsession)
 	$(call g_install)
+
+.PHONY: install_Xresources
+install_Xresources : $(installed_xresources)
+	@echo "@@@ Backups of X resource files:"
+	$(call g_list_old_files, $^)
+	@echo "@@@"
 
 .PHONY: install_Xsession
 install_Xsession : $(installed_xsession)
@@ -97,7 +140,7 @@ install_Xsession : $(installed_xsession)
 	@echo "@@@"
 
 .PHONY: install
-install : install_Xsession
+install : install_Xresources install_Xsession
 
 .PHONY: list_old_files
 list_old_files :
