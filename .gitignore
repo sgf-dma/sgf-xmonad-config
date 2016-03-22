@@ -7,7 +7,6 @@ t.*
 dist/
 build/
 .stack-work/
-extra-deps/
 
 # Any other..
 nohup.out
