@@ -11,6 +11,8 @@ cp		?= cp -v
 install		?= install -v  -m 640
 install_dir	?= install -v -m 750 -d
 
+.SUFFIXES:
+
 # Whether to backup installed files, if they differ from new files. Note, that
 # `g_install` compares built version of file, which it wants to install, with
 # already installed version. Particularly, it does not try to determine
@@ -37,18 +39,26 @@ installed_files		:= $(installed_xsession)
 
 
 ## Build.
-$(build_dir)/%.sh : $(src_dir)/%.sh
+# Warning: following implicit rules create intermediate files! See 10.4
+# "Chains of Implicit Rules". That means:
+# - If they (built files) don't exist, `make install` won't create them and
+#   compare target (installed) file timestamp with source file timestamp
+#   (avoiding built files).
+# - After using them (e.g. during `make install`) `make` will delete these
+#   (built) files.
+#
+# But because these files are not compiled and just copied "as is", there is
+# no sense in taking them into account during install. Though, if i want to
+# treat them as *not* intermediata, i may rewrite following implicit rules to
+# static pattern rules and delete some (of them) from .INTERMEDIATE below.
+$(build_dir)/%.sh :: $(src_dir)/%.sh
 	$(mkdir) $(dir $@)
 	$(cp) $< $@
 
-# Fallback build.
-$(build_dir)/% : $(src_dir)/%
+# Fallback build (terminal rule).
+$(build_dir)/% :: $(src_dir)/%
 	$(mkdir) $(dir $@)
 	$(cp) $< $@
-
-.PHONY: Xsession
-Xsession : $(addprefix $(build_dir)/, $(xsession) $(xsession_scripts))
-
 
 ## Install.
 # Generic install recipe, which checks whether file already exists and differs
@@ -75,6 +85,8 @@ endef
 
 $(xsession_dir)/%.sh : $(build_dir)/%.sh
 	$(call g_install)
+# See above note about intermediate files.
+.INTERMEDIATE: $(build_dir)/$(xsession)
 $(HOME)/.Xsession : $(build_dir)/$(xsession)
 	$(call g_install)
 
