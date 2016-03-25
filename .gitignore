@@ -2,6 +2,7 @@ t.*
 *.o
 *.hi
 dist/
+build/
 
 nohup.out
 xmonad.errors
