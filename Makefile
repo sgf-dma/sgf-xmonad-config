@@ -22,7 +22,7 @@ build_dir	:= build
 
 xsession_dir		:= $(HOME)/.Xsession.d
 xsession		:= Xsession
-xsession_scripts	:= run_cmd.sh
+xsession_scripts	:= run_cmd.sh xkb_ctrl_esc_to_super.sh
 installed_xsession	:= $(HOME)/.Xsession $(addprefix $(xsession_dir)/, $(xsession_scripts))
 
 bin_path		:= $(HOME)/bin
