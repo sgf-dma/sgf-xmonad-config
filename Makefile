@@ -30,7 +30,10 @@ home_local_path		:= $(HOME)/.local
 stack_bin_path		:= $(HOME)/.local/bin
 installed_xmonad	:= $(stack_bin_path)/xmonad $(HOME)/.xmonad xmonad-$(uname_M)-$(uname_S)
 
-installed_files		:= $(installed_xsession) $(installed_xmonad)
+xmobar_configs		:= xmobarrc xmobarrcAlt
+installed_xmobar 	:= $(stack_bin_path)/xmobar $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
+
+installed_files		:= $(installed_xsession) $(installed_xmonad) $(installed_xmobar)
 
 
 ## Build.
@@ -105,8 +108,21 @@ install_xmonad : $(installed_xmonad)
 	$(call g_list_old_files, $^)
 	@echo "@@@"
 
+# I need non-empty stem for all matching config names.
+$(HOME)/.xmobar% : $(build_dir)/xmobar%
+	$(call install_file)
+
+$(stack_bin_path)/xmobar : $(stack_bin_path)
+	stack install xmobar
+
+.PHONY: install_xmobar
+install_xmobar : $(installed_xmobar)
+	@echo "@@@ Backups of xmobar files:"
+	$(call g_list_old_files, $^)
+	@echo "@@@"
+
 .PHONY: install
-install : install_Xsession install_xmonad
+install : install_Xsession install_xmonad install_xmobar
 
 .PHONY: list_old_files
 list_old_files :
