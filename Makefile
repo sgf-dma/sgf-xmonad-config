@@ -31,7 +31,8 @@ stack_bin_path		:= $(HOME)/.local/bin
 installed_xmonad	:= $(stack_bin_path)/xmonad $(HOME)/.xmonad xmonad-$(uname_M)-$(uname_S)
 
 xmobar_configs		:= xmobarrc xmobarrcAlt
-installed_xmobar 	:= $(stack_bin_path)/xmobar $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
+#installed_xmobar 	:= $(stack_bin_path)/xmobar $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
+installed_xmobar 	:= $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
 
 installed_files		:= $(installed_xsession) $(installed_xmonad) $(installed_xmobar)
 
