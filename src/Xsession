@@ -21,6 +21,9 @@ run_cmd wpa_gui
 
 xkb_ctrl_esc_to_super
 
+if ! echo "$PATH" | grep -q -F "$HOME/bin"; then
+    export PATH="$HOME/bin:$PATH"
+fi
 echo "Starting xmonad.."
 exec ~/bin/xmonad
 
