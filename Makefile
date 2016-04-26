@@ -12,7 +12,9 @@ rm		?= rm -v -f
 # after clean and rebuild.
 cp		?= cp -v
 
-uname_M 	:= $(shell uname -m)
+# Haskell's `arch` from System.Info defines 32-bit architecture as i386, so
+# should i.
+uname_M 	:= $(subst i686,i386,$(shell uname -m))
 uname_S 	:= $(call lc,$(shell uname -s))
 
 .SUFFIXES:

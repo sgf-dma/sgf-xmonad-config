@@ -21,9 +21,13 @@ run_cmd wpa_gui
 
 xkb_ctrl_esc_to_super
 
-if ! echo "$PATH" | grep -q -F "$HOME/bin"; then
-    export PATH="$HOME/bin:$PATH"
-fi
+# Haskell's `arch` from System.Info defines 32-bit architecture as i386, so
+# should i.
+uname_M="$(uname -m | sed -e 's/i686/i386/')"
+# `tr` does not work for non-ascii chars, though is more compatible, than
+# version with GNU sed's '\L' flag in s/// command (which works with unicode),
+uname_S="$(uname -s | tr '[[:upper:]]' '[[:lower:]]')"
+user_xmonad="~/.xmonad/xmonad-$uname_M-$uname_S"
 echo "Starting xmonad.."
-exec ~/bin/xmonad
+exec $user_xmonad
 
