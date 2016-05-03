@@ -3,6 +3,21 @@ install		?= install -v -m 640
 install_dir	?= install -v -m 750 -d
 ln		?= ln -v -f -s
 
+# In make 3.81 $(wildcard) function does not see files built by make. In make
+# 4.0 it does, but this makes make's own $(wildcard) function unreliable as
+# file existence check. Strangely, make's $(realpath) function sees files
+# created by make in both versions. But there is an opinion
+# (https://stackoverflow.com/questions/15048091/gnu-make-wildcard-function-doesnt-find-runtime-generated-files),
+# that make expands all its variables, including functions, before recipe is
+# run and this explains $(wildcard) behavior in 3.81. Though, this does not
+# explain neither $(realpath) nor $(wildcard) in make 4.0 behavior, i'd better
+# use shell equivalents..
+# My $(readlink) function should behave the same way as make's $(realpath)
+# function, i.e. it requires all path components to exist.
+readlink	?= $(shell readlink -e $(1))
+# Since i can't go without coreutils's `readlink` i'll use it for existence
+# test too.
+does_exist	?= $(shell readlink -e $(1))
 
 # Generic install functions install_file() and install_link() check whether
 # target already exists and differs from source and, if so, instruct `install`
@@ -57,7 +72,7 @@ force_install	?=
 # f  - file.
 # s  - symlink.
 # *  - any.
-is_differ_file = $(if $(and $(wildcard $(2)), $(call isnt_directory,$(2))),$(if $(shell diff -q $(1) $(2) || echo $$?),$(true)),$(true))
+is_differ_file = $(if $(and $(call does_exist,$(2)), $(call isnt_directory,$(2))),$(if $(shell diff -q $(1) $(2) || echo $$?),$(true)),$(true))
 
 # Function: is_differ_link.
 # Require target type and compare fully derefenced pathes. Files are
@@ -89,16 +104,16 @@ is_differ_file = $(if $(and $(wildcard $(2)), $(call isnt_directory,$(2))),$(if 
 # f  - file.
 # s  - symlink.
 # *  - any.
-is_differ_link = $(if $(and $(wildcard $(2)), $(call is_symlink,$(2))),$(call sne,$(realpath $(1)),$(realpath $(2))),$(true))
+is_differ_link = $(if $(and $(call does_exist,$(2)), $(call is_symlink,$(2))),$(call sne,$(call readlink,$(1)),$(call readlink,$(2))),$(true))
 
 # Function: is_directory and isnt_directory.
 # Is file exists and a directory (or symlink to directory).
-is_directory = $(if $(wildcard $(1)/.),$(true))
+is_directory = $(if $(call does_exist,$(1)/.),$(true))
 isnt_directory = $(call not,$(call is_directory,$(1)))
 
 # Function: is_symlink and isnt_symlink.
 # Is file exists and a symlink to an existing file or directory.
-is_symlink = $(if $(and $(wildcard $(1)), $(call sne,$(realpath $(dir $(1)))/$(notdir $(1)),$(realpath $(1)))),$(true))
+is_symlink = $(if $(and $(call does_exist,$(1)), $(call sne,$(call readlink,$(dir $(1)))/$(notdir $(1)),$(call readlink,$(1)))),$(true))
 isnt_symlink = $(call not,$(call is_symlink,$(1)))
 
 # Function: real_install_file.
@@ -108,7 +123,7 @@ isnt_symlink = $(call not,$(call is_symlink,$(1)))
 # 2 - target (will be overwritten to file, if is file or symlink to file and
 #   (file pointed to) content differs or is directory).
 define real_install_file
-	$(if $(and $(wildcard $(1))
+	$(if $(and $(call does_exist,$(1))
 		, $(call isnt_directory,$(1))
 		, $(call isnt_symlink,$(1)))
 	    , $(if $(or $(force_install),$(call is_differ_file,$(1),$(2)))
@@ -134,7 +149,7 @@ install_file = $(call real_install_file,$(if $(1),$(1),$<),$(if $(2),$(2),$@))
 # 2 - target (will be overwritten to symlink, if is symlink and points to
 #   different path or is not a symlink).
 define real_install_link
-	$(if $(wildcard $(1))
+	$(if $(call does_exist,$(1))
 	    , $(if $(or $(force_install),$(call is_differ_link,$(1),$(2)))
 		, $(ln) -T \
 		    $(if $(backup_install),--backup=numbered) \
