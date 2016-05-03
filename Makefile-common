@@ -130,8 +130,8 @@ define real_install_file
 		, $(install) -T \
 		    $(if $(backup_install),--backup=numbered) \
 		    $(1) $(2)
-		, @echo "real_install_file: Files '$(1)' and '$(2)' are identical. Nothing to do.")
-	    , @echo "real_install_file: Source '$(1)' not found or it's not a file for target file '$(2)'.")
+		, $(warning "real_install_file: Files '$(1)' and '$(2)' are identical. Nothing to do."))
+	    , $(warning "real_install_file: Source '$(1)' not found or it's not a file for target file '$(2)'."))
 endef
 
 # Function: install_file.
@@ -154,8 +154,8 @@ define real_install_link
 		, $(ln) -T \
 		    $(if $(backup_install),--backup=numbered) \
 		    $(1) $(2)
-		, @echo "real_install_link: Link '$(2)' already points to '$(1)'. Nothing to do.")
-	    , @echo "real_install_link: No source '$(1)' found for target link '$(2)'.")
+		, $(warning "real_install_link: Link '$(2)' already points to '$(1)'. Nothing to do."))
+	    , $(warning "real_install_link: No source '$(1)' found for target link '$(2)'."))
 endef
 
 # Function: install_link.
