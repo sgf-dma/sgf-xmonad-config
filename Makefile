@@ -101,7 +101,7 @@ $(HOME)/.xmonad : FORCE
 xmonad-$(uname_M)-$(uname_S): $(stack_bin_path)/xmonad FORCE
 	$(call install_link,$(stack_bin_path)/xmonad)
 
-$(stack_bin_path)/xmonad : build_xmonad $(stack_bin_path)
+$(stack_bin_path)/xmonad $(stack_bin_path)/xmobar : build_xmonad $(stack_bin_path)
 	stack install
 
 .PHONY: install_xmonad
@@ -113,9 +113,6 @@ install_xmonad : $(installed_xmonad)
 # I need non-empty stem for all matching config names.
 $(HOME)/.xmobar% : $(build_dir)/xmobar%
 	$(call install_file)
-
-$(stack_bin_path)/xmobar : $(stack_bin_path)
-	stack install xmobar
 
 .PHONY: install_xmobar
 install_xmobar : $(installed_xmobar)
