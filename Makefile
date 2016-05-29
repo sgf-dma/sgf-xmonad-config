@@ -1,4 +1,7 @@
 
+include gmsl
+include Makefile-common
+
 # To enable features (for make and other, .e.g m4), set corresponding
 # environment variable to non-empty value (e.g. 1).
 mkdir		?= mkdir -pv
@@ -8,34 +11,32 @@ rm		?= rm -v -f
 # file are the same (fallback build), timestamp on built file will not change
 # after clean and rebuild.
 cp		?= cp -v
-install		?= install -v  -m 640
-install_dir	?= install -v -m 750 -d
+
+# Haskell's `arch` from System.Info defines 32-bit architecture as i386, so
+# should i.
+uname_M 	:= $(subst i686,i386,$(shell uname -m))
+uname_S 	:= $(call lc,$(shell uname -s))
 
 .SUFFIXES:
-
-# Whether to backup installed files, if they differ from new files. Note, that
-# `g_install` compares built version of file, which it wants to install, with
-# already installed version. Particularly, it does not try to determine
-# whether current installed version comes from previous git revision. For
-# determining is installed file comes from some revision in git repository i
-# may use something like:
-#
-# 	git rev-list --all | xargs -IREPL git ls-tree REPL -- src/Xsession | uniq \
-# 		| grep $(git hash-object ~/.Xsession)
-#
-# but anyway, this will only work for files installed "as is" (e.g. shell
-# scripts), but not for built files (m4).
-backup_install	?=
 
 src_dir		:= src
 build_dir	:= build
 
 xsession_dir		:= $(HOME)/.Xsession.d
 xsession		:= Xsession
-xsession_scripts	:= run_cmd.sh
+xsession_scripts	:= run_cmd.sh xkb_ctrl_esc_to_super.sh
 installed_xsession	:= $(HOME)/.Xsession $(addprefix $(xsession_dir)/, $(xsession_scripts))
 
-installed_files		:= $(installed_xsession)
+bin_path		:= $(HOME)/bin
+home_local_path		:= $(HOME)/.local
+stack_bin_path		:= $(HOME)/.local/bin
+installed_xmonad	:= $(stack_bin_path)/xmonad $(HOME)/.xmonad xmonad-$(uname_M)-$(uname_S)
+
+xmobar_configs		:= xmobarrc xmobarrcAlt
+#installed_xmobar 	:= $(stack_bin_path)/xmobar $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
+installed_xmobar 	:= $(HOME)/.xmobarrc $(HOME)/.xmobarrcAlt
+
+installed_files		:= $(installed_xsession) $(installed_xmonad) $(installed_xmobar)
 
 
 ## Build.
@@ -60,22 +61,12 @@ $(build_dir)/% :: $(src_dir)/%
 	$(mkdir) $(dir $@)
 	$(cp) $< $@
 
+.PHONY: build_xmonad
+build_xmonad : 
+	stack --install-ghc build
+
+
 ## Install.
-# Generic install recipe, which checks whether file already exists and differs
-# from new one, and, if so, instructs `install` to create a numbered backup.
-# Args:
-# 1 - source file. If not present, will use the first prerequisite.
-# I need, that 'if' and following file `install` command execute in *one*
-# shell, otherwise 'inst_opts' shell variable set in 'if' would not be
-# available at 'install' invocation. Thus, i need to group them into one shell
-# command.
-define g_install
-	$(install_dir) -d $(dir $@)
-	if ! diff -q $@ $(if $(1), $(1), $<); then \
-	  inst_opts="--backup=numbered"; \
-	fi; \
-	$(install) $(if $(backup_install),$$inst_opts) -T $(if $(1), $(1), $<) $@
-endef
 
 # List file backups, created by `g_install` .
 define g_list_old_files
@@ -83,12 +74,15 @@ define g_list_old_files
 )
 endef
 
-$(xsession_dir)/%.sh : $(build_dir)/%.sh
-	$(call g_install)
+$(xsession_dir) :
+	$(install_dir) $@
+
+$(xsession_dir)/%.sh : $(build_dir)/%.sh $(xsession_dir)
+	$(call install_file)
 # See above note about intermediate files.
 .INTERMEDIATE: $(build_dir)/$(xsession)
 $(HOME)/.Xsession : $(build_dir)/$(xsession)
-	$(call g_install)
+	$(call install_file)
 
 .PHONY: install_Xsession
 install_Xsession : $(installed_xsession)
@@ -96,8 +90,42 @@ install_Xsession : $(installed_xsession)
 	$(call g_list_old_files, $^)
 	@echo "@@@"
 
+$(bin_path) $(home_local_path) :
+	$(install_dir) $@
+
+$(stack_bin_path) : $(bin_path) $(home_local_path)
+	$(call install_link)
+
+$(HOME)/.xmonad : FORCE
+	$(call install_link,$(CURDIR))
+
+xmonad-$(uname_M)-$(uname_S): $(stack_bin_path)/xmonad FORCE
+	$(call install_link,$(stack_bin_path)/xmonad)
+
+$(stack_bin_path)/xmonad : build_xmonad $(stack_bin_path)
+	stack install
+
+.PHONY: install_xmonad
+install_xmonad : $(installed_xmonad)
+	@echo "@@@ Backups of xmonad files:"
+	$(call g_list_old_files, $^)
+	@echo "@@@"
+
+# I need non-empty stem for all matching config names.
+$(HOME)/.xmobar% : $(build_dir)/xmobar%
+	$(call install_file)
+
+$(stack_bin_path)/xmobar : $(stack_bin_path)
+	stack install xmobar
+
+.PHONY: install_xmobar
+install_xmobar : $(installed_xmobar)
+	@echo "@@@ Backups of xmobar files:"
+	$(call g_list_old_files, $^)
+	@echo "@@@"
+
 .PHONY: install
-install : install_Xsession
+install : install_Xsession install_xmonad install_xmobar
 
 .PHONY: list_old_files
 list_old_files :
@@ -111,6 +139,7 @@ FORCE:
 
 clean :
 	$(rmdir) $(build_dir)
+	stack clean
 
 remove :
 	$(rm) $(installed_files)
