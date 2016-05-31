@@ -76,11 +76,30 @@ endef
 $(xsession_dir) :
 	$(install_dir) $@
 
-$(xsession_dir)/%.sh : $(build_dir)/%.sh $(xsession_dir)
+# Warning: Note, dependency on FORCE. There is a trick here, in rules for
+# installing ~/.Xsession and files in ~/.Xsession.d . The first one works as
+# expected: ~/.Xsession is re-installed only, when its modification time is
+# greater, than modification time of installed file. Particularly, that means,
+# that when i edit installed ~/.Xsession in-place, it won't be reinstalled
+# unless Xsession in repository has changed. But the behavior is different for
+# files in ~/.Xsession.d due to rule dependency on ~/.Xsession.d directory. If
+# there is more, than one file, modification time of directory is equal to
+# install (modification) time of file installed the last, and, consequently,
+# is greater, than modification time of files installed first. Or, if i open
+# or edit some of these files in editor, which creates temporary files, like
+# vim, modification time of directory also gets updated. In both these cases,
+# `make` thinks, that it needs to reinstall (one or more) ~/.Xsession.d files.
+# Thus, these files may be reinstalled more often, than they're changed in
+# source repository and than i expect.
+#
+# For making this behavior consistent and matching the idea, that installed
+# files must not be edited in-place, i reinstall all xsession files every time
+# (actual copy may not happen, if files have not changed).
+$(xsession_dir)/%.sh : $(build_dir)/%.sh $(xsession_dir) FORCE
 	$(call install_file)
 # See above note about intermediate files.
 .INTERMEDIATE: $(build_dir)/$(xsession)
-$(HOME)/.Xsession : $(build_dir)/$(xsession)
+$(HOME)/.Xsession : $(build_dir)/$(xsession) FORCE
 	$(call install_file)
 
 .PHONY: install_Xsession
