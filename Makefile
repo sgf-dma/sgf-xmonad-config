@@ -67,12 +67,6 @@ build_xmonad :
 
 ## Install.
 
-# List file backups, created by `g_install` .
-define g_list_old_files
-	$(foreach f, $(1), @find $(dir $(f)) -maxdepth 1 -type f -name '$(notdir $(f)).~*~' | sort;
-)
-endef
-
 $(xsession_dir) :
 	$(install_dir) $@
 
@@ -105,7 +99,7 @@ $(HOME)/.Xsession : $(build_dir)/$(xsession) FORCE
 .PHONY: install_Xsession
 install_Xsession : $(installed_xsession)
 	@echo "@@@ Backups of Xsession files:"
-	$(call g_list_old_files, $^)
+	$(call list_backup_files,$^)
 	@echo "@@@"
 
 $(bin_path) $(home_local_path) :
@@ -126,7 +120,7 @@ $(stack_bin_path)/xmonad $(stack_bin_path)/xmobar : build_xmonad $(stack_bin_pat
 .PHONY: install_xmonad
 install_xmonad : $(installed_xmonad)
 	@echo "@@@ Backups of xmonad files:"
-	$(call g_list_old_files, $^)
+	$(call list_backup_files,$^)
 	@echo "@@@"
 
 # I need non-empty stem for all matching config names.
@@ -136,18 +130,23 @@ $(HOME)/.xmobar% : $(build_dir)/xmobar%
 .PHONY: install_xmobar
 install_xmobar : $(installed_xmobar)
 	@echo "@@@ Backups of xmobar files:"
-	$(call g_list_old_files, $^)
+	$(call list_backup_files,$^)
 	@echo "@@@"
 
 .PHONY: install
 install : install_Xsession install_xmonad install_xmobar
 
-.PHONY: list_old_files
-list_old_files :
+.PHONY: list_backups
+list_backups :
 	@echo "@@@ Backups of installed files:"
-	$(call g_list_old_files, $(installed_files))
+	$(call list_backup_files,$(installed_files))
 	@echo "@@@"
 
+.PHONY: remove_backups
+remove_backups :
+	@echo "@@@ Remove backups of installed files:"
+	$(call remove_backup_files,$(installed_files))
+	@echo "@@@"
 
 # See 4.7 "Rules without Recipes or Prerequisites" in make manual.
 FORCE:

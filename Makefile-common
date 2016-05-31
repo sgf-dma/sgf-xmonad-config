@@ -2,6 +2,7 @@
 install		?= install -v -m 640
 install_dir	?= install -v -m 750 -d
 ln		?= ln -v -f -s
+rm		?= rm -v -f
 
 # In make 3.81 $(wildcard) function does not see files built by make. In make
 # 4.0 it does, but this makes make's own $(wildcard) function unreliable as
@@ -164,4 +165,28 @@ endef
 # 1 - source (use first prerequisite, if not specified).
 # 2 - target (use make rule target, if not specified).
 install_link = $(call real_install_link,$(if $(1),$(1),$<),$(if $(2),$(2),$@))
+
+# Function: backup_files_of.
+# Search for numbered backup files, created by install_X functions, sorting
+# them in increasing version order (oldest first).
+# Note: this shell command is *not* terminated (no newline or semicolon at the
+# end), thus, when using in $(foreach) i need to terminate it explicitly.
+backup_files_of = find $(dir $(1)) -maxdepth 1 -type f -name '$(notdir $(1)).~*~' | sort -V
+
+# Function: list_backup_files.
+# Search for numbered backup files, created by install_X functions, of every
+# argument.
+# Arguments:
+# 1.. - files to search backup files of.
+list_backup_files = @$(foreach f,$(1),$(call backup_files_of,$(f));)
+
+# Function: remove_backup_files.
+# Remove oldest (with the lowest version) numbered backup file, created by
+# install_X functions, of every argument.
+# Arguments:
+# 1.. - files to remove backup files of.
+define remove_backup_files
+	@$(foreach f,$(1),$(call backup_files_of,$(f)) | head -n1 \
+	    | xargs --no-run-if-empty $(rm);)
+endef
 
