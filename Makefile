@@ -146,6 +146,13 @@ list_backups :
 remove_backups :
 	@echo "@@@ Remove backups of installed files:"
 	$(call remove_backup_files,$(installed_files))
+
+.PHONY: list_installed_files
+list_installed_files :
+	@echo "@@@ All files:"
+	@echo $(installed_files)
+	@echo "@@@ Installed files:"
+	@ls -la $(installed_files) 2>/dev/null || exit 0
 	@echo "@@@"
 
 # See 4.7 "Rules without Recipes or Prerequisites" in make manual.
