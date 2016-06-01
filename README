@@ -1,6 +1,9 @@
 Build dependencies:
-1. xmobar is recompiled and installed (by stack) as part of this package.
-   Thus, i have two additional (system) dependencies:
+1. GNU `make`.
+2. `git`.
+3. `stack` (http://www.haskellstack.org).
+4. xmobar is recompiled and installed (by stack) as part of this package.
+   Thus, there are two additional (system) dependencies:
     - xpm.h (libxpm-dev on Debian, Ubuntu).
     - iwlib library (libiw-dev on Debian, Ubuntu).
 
@@ -30,4 +33,97 @@ Search path:
       extra-dep: true
 
    (note, indentation of 'extra-dep' is the same as of 'location')
+
+Installation:
+1. Install `stack`:
+   http://docs.haskellstack.org/en/stable/README/#how-to-install
+2. Install GNU `make`.
+3. Install xmonad config:
+
+    $ make install
+
+4. Makefile tries to detect whether files about to install already exist and
+   differ. And if so, it makes numbered backup of existing file (see `info
+   coreutils`, "2.2 Backup options"). You may list existing backups:
+
+    $ make list_backups
+
+   and remove them one (oldest) level of each file at a time:
+
+    $ make remove_backups
+
+   you may also see, which files are installed:
+
+    $ make list_installed_files
+
+   if you don't want to create backups:
+
+    $ make install backup_install=
+
+   If you want to reinstall files, even if Makefile thinks, they're identical
+   (this will create backups of existing files, even if they're identical,
+   unless backups are turned off):
+
+    $ make install force_install=1
+
+5. There are separate targets for some components:
+    - build_xmonad - only builds xmonad (this is the default target).
+    - install_Xsession - only installs Xsession scripts.
+    - install_xmonad - only builds and installs xmonad.
+    - install_xmobar - only builds and installs xmobar.
+6. xmonad may be build and installed with stack explicitly:
+
+    stack build
+    stack install
+
+   but in that case other files (xmobar configs, Xsession files, symlinks)
+   won't be installed. This may be used to recompile xmonad.hs after changes,
+   though.
+7. Any file (either in build/ directory or at its installation location) is a
+   target, so to rebuild/reinstall particular file you may just specify its
+   path as a target.
+
+Additiional directories:
+1. `make` performs build in build/ subdirectory inside a project.
+2. `stack` installs haskell compiler and all required packages from LTS
+   Haskell snapshot in user's home directory:
+
+    $ stack path --stack-root
+
+   Other packages (extra deps) go into .stack-work directory inside a project:
+
+    $ stack path --project-root
+
+3. `stack` installs binaries in
+
+    $ stack path --local-bin-path
+
+4. xmonad directory `~/.xmonad` and user-defined xmonad config binary
+   `~/.xmonad/xmonad-ARCH-OS` are made symlinks properly by `make install`.
+
+Removal.
+1. To clean build:
+
+    $ make clean
+
+   or for stack only:
+
+    $ stack clean
+
+2. To remove:
+
+    $ make remove
+
+3. You may also want to remove stack user's directory:
+
+    $ stack path --stack-root
+
+   and stack local bin path directory:
+
+    $ stack path --local-bin-path
+
+   and some other directories may still be left:
+
+    ~/.Xsession.d
+    ~/bin
 
