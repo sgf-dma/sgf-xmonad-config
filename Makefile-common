@@ -37,7 +37,7 @@ does_exist	?= $(shell readlink -e $(1))
 #
 # but anyway, this will only work for files installed "as is" (e.g. shell
 # scripts), but not for built files (m4).
-backup_install	?=
+backup_install	?= $(true)
 
 # Variable: force_install.
 # Whether to overwrite installed files, even if they seem identical (from my
