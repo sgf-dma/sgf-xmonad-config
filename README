@@ -1,0 +1,33 @@
+Build dependencies:
+1. xmobar is recompiled and installed (by stack) as part of this package.
+   Thus, i have two additional (system) dependencies:
+    - xpm.h (libxpm-dev on Debian, Ubuntu).
+    - iwlib library (libiw-dev on Debian, Ubuntu).
+
+Runtime dependencies:
+1. `xmobar` is used as a panel.
+2. `trayer` is used as a tray.
+3. `feh` is used for settings desktop background (fallback to `xsetroot`, if
+   not found).
+4. `xterm` is used as default terminal.
+5. `gmrun` is used as launcher.
+
+Search path:
+1. xmonad launch does not have any PATH requirments.
+2. xmobar is first searched in stack local bin path (~/.local/bin), then in
+   PATH. I.e. ~/.local/bin is hardcoded and effectively *prepended* to PATH.
+   So, to use system's xmobar do not install xmobar by stack. The one way to
+   do this is to mark xmobar as 'extra-dep' in `stack.yaml`:
+
+    - location: extra-pkgs/xmobar
+      extra-dep: true
+
+   or, if you're on master branch:
+
+    - location:
+        git: https://github.com/jaor/xmobar.git
+        commit: 2b165cafcef3ad7f510590fcdbb928ae742ce2f4
+      extra-dep: true
+
+   (note, indentation of 'extra-dep' is the same as of 'location')
+

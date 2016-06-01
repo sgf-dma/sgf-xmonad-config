@@ -1,47 +1,53 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 
 import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
-import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
+import XMonad.Hooks.DynamicLog (PP, shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
+import XMonad.Layout.ResizableTile
 
+import Data.List
+
+import Control.Monad
+import Control.Exception
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import Data.Monoid
-import Control.Applicative
 import System.Process
-
 import System.FilePath
 import System.Directory
-import Codec.Binary.UTF8.String (encodeString) 
+import System.IO.Error
+import System.Info
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
+import Sgf.XMonad.Restartable.Firefox
+import Sgf.XMonad.Restartable.Feh
+import Sgf.XMonad.Restartable.XTerm
 import Sgf.XMonad.Docks
 import Sgf.XMonad.Docks.Xmobar
+import Sgf.XMonad.Docks.Trayer
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
-import Sgf.XMonad.Util.Run
 import Sgf.XMonad.Trace
 import Sgf.XMonad.Focus
+import Sgf.XMonad.Workspaces
+
+import Data.Maybe
 
 main :: IO ()
-main                = withHelper main_0
-
-main_0 :: IO ()
-main_0              = do
+main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
-    let xcf = handleFocus (Just (0, xK_a)) myFocusHook
+    let xcf = handleFocus Nothing myFocusHook
+                . handleDefaultWorkspaces False (`elem` ["7"])
                 . handleFullscreen
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
-                $ defaultConfig
+                $ def
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
@@ -58,8 +64,24 @@ main_0              = do
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
+                    , clickJustFocuses = False
+                    , manageHook = manageLockWorkspace "lock"
+                    , layoutHook = myLayout
                     }
     handleVnc xcf >>= xmonad
+
+myLayout    = tiled ||| Mirror tiled ||| Full
+  where
+    tiled :: ResizableTall Window
+    tiled = ResizableTall nmaster delta ratio slaves
+    nmaster :: Int
+    nmaster = 1
+    delta :: Rational
+    delta   = 3/100
+    ratio :: Rational
+    ratio   = 1/2
+    slaves :: [Rational]
+    slaves  = []
 
 -- Modify layoutHook to remove borders around floating windows covering whole
 -- screen and around tiled windows in non-ambiguous cases. Also, add event
@@ -97,7 +119,6 @@ myPrograms          = [ addProg feh
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
-                      , addProg wpagui
                       , addProg xclock
                       ]
 
@@ -119,178 +140,82 @@ sessionKeys         = [(0, xK_s), sessionIMKey]
 -- .
 -- Main xmobar, which does not have hiding (Strut toggle) key.
 xmobar :: Xmobar
-xmobar              = setA xmobarPP (Just (setA ppTitleL t defaultXmobarPP))
-                        defaultXmobar
+xmobar              = setA xmobarPP (Just xp) defaultXmobar
   where
-    t :: String -> String
-    t               = xmobarColor "green" "" . shorten 50
+    xp :: PP
+    xp              = setA ppTitleL pt . setA ppHiddenL ph $ defaultXmobarPP
+    pt :: String -> String
+    pt              = xmobarColor "green" "" . shorten 50
+    ph :: WorkspaceId -> String
+    ph w            = "<action=`xdotool key super+" ++ w ++ "`>"
+                        ++ w ++ "</action>"
 -- Alternative xmobar, which has hiding (Strut toggle) key.
 xmobarAlt :: Xmobar
-xmobarAlt           = setA xmobarConf ".xmobarrcAlt"
+xmobarAlt           = setA (xmobarProg . progArgs . xmobarConf) ".xmobarrcAlt"
                         . setA xmobarToggle (Just (shiftMask, xK_b))
                         $ defaultXmobar
 
-newtype Trayer      = Trayer Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Trayer where
-    (Trayer x) `mappend` (Trayer y) = Trayer (x `mappend` y)
-    mempty          = Trayer mempty
-instance ProcessClass Trayer where
-    pidL f (Trayer x)   = Trayer <$> pidL f x
-instance RestartClass Trayer where
-    runP (Trayer x)     = Trayer <$> runP x
-    doLaunchP           = restartP
-instance DockClass Trayer where
-
 trayer :: Trayer
-trayer              = Trayer $ setA progBin "trayer"
-                        . setA progArgs
-                            [ "--edge", "top", "--align", "right"
-                            , "--SetDockType", "true"
-                            , "--SetPartialStrut", "true"
-                            , "--expand", "true", "--width", "10"
-                            , "--transparent", "true" , "--tint", "0x191970"
-                            , "--height", "12"
-                            ]
-                        . setA progWait 300000
-                        $ defaultProgram
+trayer              = setA (trayerProg . progWait) 300000
+                        . modifyA (trayerProg . progArgs . trayerArgs)
+                          (++ [ "--edge", "top", "--align", "right"
+                              , "--width", "10", "--height", "12"
+                              , "--transparent", "true" , "--tint", "0x191970"
+                              , "--expand", "true"
+                              ])
+                        $ defaultTrayer
 
 -- END Docks }}}
 -- Programs {{{
 
--- Use `xsetroot -grey`, if no .fehbg found.
-newtype Feh         = Feh Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Feh where
-    (Feh x) `mappend` (Feh y) = Feh (x `mappend` y)
-    mempty          = Feh mempty
-instance ProcessClass Feh where
-    pidL f (Feh x)  = Feh <$> pidL f x
-instance RestartClass Feh where
-    runP (Feh x)    = do
-        cmd <- liftIO $ do
-          h <- getHomeDirectory
-          let f = h </> ".fehbg"
-          b <- doesFileExist f
-          if b
-            then readFile f
-            else return "xsetroot -grey"
-        Feh <$> runP (setA progArgs ["-c", encodeString cmd] x)
+-- Will use `xsetroot -grey`, if no .fehbg found.
 feh :: Feh
-feh                 = Feh   $ setA progBin "/bin/sh"
-                            . setA progArgs ["-c", ""]
-                            $ defaultProgram
+feh                 = defaultFeh
 
--- Program used as terminal.
-xterm :: Program
-xterm               = setA progBin "xterm" defaultProgram
+-- With such definition, `xterm == xtermUser`, but that should not matter,
+-- because 'xterm' launched untracked using `runP` (and, thus,  should not
+-- appear in Extensible State).
+xterm :: XTerm
+xterm               = defaultXTerm
+xtermUser :: XTerm
+xtermUser           = setA progWorkspace "2"
+                        . setA progLaunchKey ((0, xK_x) : sessionKeys)
+                        $ defaultXTerm
+-- In fact, title "root" will be immediately overwritten by shell. But for
+-- xmonad values 'xtermUser' and 'xtermRoot' will no longer equal.
+xtermRoot :: XTerm
+xtermRoot           = setA progWorkspace "3"
+                        . setA (progArgs . xtermTitle) "root"
+                        . setA progLaunchKey ((shiftMask, xK_x) : sessionKeys)
+                        $ defaultXTerm
 
--- User terminal.
-newtype XTermUser   = XTermUser Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XTermUser where
-    (XTermUser x) `mappend` (XTermUser y) = XTermUser (x `mappend` y)
-    mempty          = XTermUser mempty
-instance ProcessClass XTermUser where
-    pidL f (XTermUser x)    = XTermUser <$> pidL f x
-instance RestartClass XTermUser where
-    runP (XTermUser x)      = XTermUser <$> runP x
-    manageP (XTermUser _)   = doShift "2"
-    launchKey               = const ((0, xK_x) : sessionKeys)
-xtermUser :: XTermUser
-xtermUser           = XTermUser xterm
-
--- Root terminal.
-newtype XTermRoot   = XTermRoot Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XTermRoot where
-    (XTermRoot x) `mappend` (XTermRoot y) = XTermRoot (x `mappend` y)
-    mempty          = XTermRoot mempty
-instance ProcessClass XTermRoot where
-    pidL f (XTermRoot x)    = XTermRoot <$> pidL f x
-instance RestartClass XTermRoot where
-    runP (XTermRoot x)      = XTermRoot <$> runP x
-    manageP (XTermRoot _)   = doShift "3"
-    launchKey               = const ((shiftMask, xK_x) : sessionKeys)
-xtermRoot :: XTermRoot
-xtermRoot           = XTermRoot xterm
-
-newtype Firefox     = Firefox Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Firefox where
-    (Firefox x) `mappend` (Firefox y) = Firefox (x `mappend` y)
-    mempty          = Firefox mempty
-instance ProcessClass Firefox where
-    pidL f (Firefox x)  = Firefox <$> pidL f x
-instance RestartClass Firefox where
-    runP (Firefox x)    = Firefox <$> runP x
-    manageP (Firefox _) = doShift "1"
-    launchAtStartup     = const False
-    launchKey           = const ((0, xK_f) : sessionKeys)
 firefox :: Firefox
-firefox             = Firefox
-                        . setA progBin "firefox"
+firefox             = setA progStartup False
+                        . setA progWorkspace "1"
+                        . setA progLaunchKey ((0, xK_f) : sessionKeys)
+                        . setA (progArgs . firefoxProfile) "sgf"
+                        $ defaultFirefox
+
+skype :: Program NoArgs
+skype               = setA progBin "skype"
+                        . setA progStartup False
+                        . setA progWorkspace "4"
+                        . setA progLaunchKey [(0, xK_i), sessionIMKey]
                         $ defaultProgram
 
-newtype Skype       = Skype Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Skype where
-    (Skype x) `mappend` (Skype y) = Skype (x `mappend` y)
-    mempty          = Skype mempty
-instance ProcessClass Skype where
-    pidL f (Skype x)    = Skype <$> pidL f x
-instance RestartClass Skype where
-    runP (Skype x)      = Skype <$> runP x
-    manageP (Skype _)   = doShift "4"
-    launchAtStartup     = const False
-    launchKey           = const [(0, xK_i), sessionIMKey]
-skype :: Skype
-skype               = Skype $ setA progBin "skype" defaultProgram
+pidgin :: Program NoArgs
+pidgin              = setA progBin "pidgin"
+                        . setA progStartup False
+                        . setA progWorkspace "4"
+                        . setA progLaunchKey [(shiftMask, xK_i) , sessionIMKey]
+                        $ defaultProgram
 
-newtype Pidgin      = Pidgin Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid Pidgin where
-    (Pidgin x) `mappend` (Pidgin y) = Pidgin (x `mappend` y)
-    mempty          = Pidgin mempty
-instance ProcessClass Pidgin where
-    pidL f (Pidgin x)   = Pidgin <$> pidL f x
-instance RestartClass Pidgin where
-    runP (Pidgin x)     = Pidgin <$> runP x
-    manageP (Pidgin _)  = doShift "4"
-    launchAtStartup     = const False
-    launchKey           = const [(shiftMask, xK_i), sessionIMKey]
-pidgin :: Pidgin
-pidgin              = Pidgin $ setA progBin "pidgin" defaultProgram
-
--- Just for testing.
-newtype XClock      = XClock Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid XClock where
-    (XClock x) `mappend` (XClock y) = XClock (x `mappend` y)
-    mempty          = XClock mempty
-instance ProcessClass XClock where
-    pidL f (XClock x)   = XClock <$> pidL f x
-instance RestartClass XClock where
-    runP (XClock x)     = XClock <$> runP x
-    manageP (XClock _)  = doShift "7"
-    launchAtStartup     = const False
-    launchKey           = const [(shiftMask, xK_d), sessionIMKey]
-    doLaunchP           = restartP
-xclock :: XClock
-xclock          = XClock $ setA progBin "xclock" defaultProgram
-
-newtype WpaGui      = WpaGui Program
-  deriving (Eq, Show, Read, Typeable)
-instance Monoid WpaGui where
-    (WpaGui x) `mappend` (WpaGui y) = WpaGui (x `mappend` y)
-    mempty          = WpaGui mempty
-instance ProcessClass WpaGui where
-    pidL f (WpaGui x)   = WpaGui <$> pidL f x
-instance RestartClass WpaGui where
-    runP (WpaGui x)     = WpaGui <$> runP x
-wpagui :: WpaGui
-wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
-
+xclock :: Program NoArgs
+xclock              = setA progBin "xclock"
+                        . setA progStartup False
+                        . setA progWorkspace "7"
+                        . setA progLaunchKey [(shiftMask, xK_d), sessionIMKey]
+                        $ defaultProgram
 -- END programs }}}
 
 -- Some debug traces.
@@ -299,11 +224,31 @@ wpagui          = WpaGui $ setA progBin "/usr/sbin/wpa_gui" defaultProgram
 tracePrograms :: X ()
 tracePrograms       = do
     trace "Tracked programs:"
+    traceP xmobar
+    --traceP feh
+    --traceP firefox
+{-
     traceP xtermUser
     traceP xtermRoot
     traceP xmobar
     traceP trayer
-    traceP feh
+-}
+
+-- Moves away new window from "lock" workspace regardless of current workspace
+-- and focus.
+manageLockWorkspace :: WorkspaceId -> ManageHook
+manageLockWorkspace t   = ask >>= doF . lockWorkspace t
+
+lockWorkspace :: WorkspaceId -> Window -> WindowSet -> WindowSet
+lockWorkspace t w ws    = fromMaybe ws $ do
+    i <- W.findTag w ws
+    return $ if i == t
+      then W.shiftWin (anotherWorkspace t ws) w ws
+      else ws
+
+-- Which workspace to choose, when new window has assigned to lock workspace.
+anotherWorkspace :: WorkspaceId -> WindowSet -> WorkspaceId
+anotherWorkspace t      = head . filter (/= t) . map W.tag . W.workspaces
 
 -- Key for hiding all docks defined by handleDocks, keys for hiding particular
 -- dock, if any, defined in that dock definition (see above).
@@ -321,18 +266,42 @@ myKeys XConfig {modMask = m} =
       -- Programs.
       -- Use Program `xterm` to determine which terminal to launch instead of
       -- XConfig 'terminal' record.
-      , ( (m .|. shiftMask, xK_Return)
-        , spawn' (viewA progBin xterm) (viewA progArgs xterm))
+      , ( (m .|. shiftMask, xK_Return), void (runP xterm))
       , ( (m .|. shiftMask, xK_f)
-        , spawn "exec firefox -no-remote -ProfileManager")
+        , spawn "exec firefox --new-instance -ProfileManager")
       -- Audio keys.
-      , ((0,     xF86XK_AudioLowerVolume), spawn "amixer set Master 1311-")
+      , ((0,     xF86XK_AudioLowerVolume), getDefaultSink >>= pulseVol VolDown)
       -- FIXME: This really not exactly what i want. I want, that if sound is
       -- muted, one VolUp only unmutes it. Otherwise, just VolUp-s.
-      , ((0,     xF86XK_AudioRaiseVolume), spawn $ "amixer set Master unmute; "
-                                                 ++ "amixer set Master 1311+")
-      , ((0,     xF86XK_AudioMute       ), spawn "amixer set Master mute")
+      , ((0,     xF86XK_AudioRaiseVolume), getDefaultSink >>= \s -> pulseVol VolOn s >> pulseVol VolUp s)
+      , ((0,     xF86XK_AudioMute       ), getDefaultSink >>= pulseVol VolOff)
+      , ((m,  xK_a), sendMessage MirrorShrink)
+      , ((m,  xK_z), sendMessage MirrorExpand)
+      , ((m,  xK_q), userRecompile)
       ]
+
+-- Recompile xmonad binary by calling user's binary instead of xmonad found in
+-- PATH. To support custom build systems (like stack) i need to recompile
+-- using user's binary (which has appropriate hooks). And by calling it
+-- directly i make recompilation independent from PATH value. Note, that
+-- because now argument handling in xmonad itself was moved from main to
+-- xmonad function, i should create user's binary as expected by default
+-- xmonad build and update its timestamp to prevent default xmonad build from
+-- running.
+userRecompile :: MonadIO m => m ()
+userRecompile       = do
+    dir <- getXMonadDir
+    let binn = "xmonad-"++arch++"-"++os
+        bin  = dir </> binn
+    b <- liftIO (isExecutable bin)
+    if b
+      then spawn $ bin ++ " --recompile && " ++ bin ++ " --restart"
+      else spawn $ "xmessage \"User's xmonad binary " ++ bin ++ " not found."
+			     ++ " Compile it manually first.\""
+  where
+    isExecutable :: FilePath -> IO Bool
+    isExecutable f  = catch (getPermissions f >>= return . executable)
+                            (\e -> return (const False (e :: IOError)))
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .
@@ -369,4 +338,42 @@ lock                = do
                         (_, _, _, p) <-
                             createProcess (proc "/usr/bin/xtrlock" [])
                         return p
+
+
+type Sink   = Int
+data Vol    = VolUp
+            | VolDown
+            | VolOn
+            | VolOff
+  deriving (Eq, Show)
+
+-- Use RUNNING sink, if any, as default, otherwise use sink 0.
+getDefaultSink :: X (Maybe Sink)
+getDefaultSink      = do
+    uninstallSignalHandlers
+    l <- io $ readProcess "pactl" ["list","short", "sinks"] []
+    installSignalHandlers
+    let s = maybe (Just 0) id . fmap (read . head)
+              . find ((== "RUNNING") . last) . map words . lines
+              $ l
+    return s
+
+-- Volume up/down and mute/unmute using pulseaudio.
+pulseVol :: Vol -> Maybe Sink -> X ()
+pulseVol v
+  | v == VolUp      = vol "+"
+  | v == VolDown    = vol "-"
+  where
+    vol :: String -> Maybe Sink -> X ()
+    vol p           = maybe (return ()) $ \x -> do
+                        spawn $
+                          "pactl set-sink-volume " ++ show x ++ " -- " ++ p ++ "5%"
+pulseVol v
+  | v == VolOn      = mute "off"
+  | v == VolOff     = mute "on"
+  where
+    mute :: String -> Maybe Sink -> X ()
+    mute m          = maybe (return ()) $ \x -> do
+                        spawn $
+                          "pactl set-sink-mute " ++ show x ++ " -- " ++ m
 

@@ -1,7 +1,13 @@
+# Temp/build files.
 t.*
 *.o
 *.hi
-dist/
 
+# Build system's directories.
+dist/
+build/
+.stack-work/
+
+# Any other..
 nohup.out
 xmonad.errors
