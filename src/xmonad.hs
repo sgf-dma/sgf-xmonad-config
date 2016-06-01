@@ -3,21 +3,24 @@
 import XMonad
 import XMonad.Layout.NoBorders
 import qualified XMonad.StackSet as W
-import XMonad.Hooks.DynamicLog (shorten, xmobarColor)
+import XMonad.Hooks.DynamicLog (PP, shorten, xmobarColor)
 import XMonad.Hooks.EwmhDesktops (fullscreenEventHook)
 import XMonad.Layout.LayoutModifier (ModifiedLayout)
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
-import XMonad.Hooks.DynamicLog (PP)
 import XMonad.Layout.ResizableTile
 
 import Data.List
 
 import Control.Monad
+import Control.Exception
 import Graphics.X11.ExtraTypes.XF86 -- For media keys.
-import Control.Applicative
 import System.Process
+import System.FilePath
+import System.Directory
+import System.IO.Error
+import System.Info
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Restartable
@@ -44,7 +47,7 @@ main                = withHelper $ do
                 . handleDocks (Just (0, xK_b))
                 . handleProgs (Just (0, xK_s)) (myDocks ++ myPrograms)
                 . (additionalKeys <*> myKeys)
-                $ defaultConfig
+                $ def
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
@@ -274,7 +277,31 @@ myKeys XConfig {modMask = m} =
       , ((0,     xF86XK_AudioMute       ), getDefaultSink >>= pulseVol VolOff)
       , ((m,  xK_a), sendMessage MirrorShrink)
       , ((m,  xK_z), sendMessage MirrorExpand)
+      , ((m,  xK_q), userRecompile)
       ]
+
+-- Recompile xmonad binary by calling user's binary instead of xmonad found in
+-- PATH. To support custom build systems (like stack) i need to recompile
+-- using user's binary (which has appropriate hooks). And by calling it
+-- directly i make recompilation independent from PATH value. Note, that
+-- because now argument handling in xmonad itself was moved from main to
+-- xmonad function, i should create user's binary as expected by default
+-- xmonad build and update its timestamp to prevent default xmonad build from
+-- running.
+userRecompile :: MonadIO m => m ()
+userRecompile       = do
+    dir <- getXMonadDir
+    let binn = "xmonad-"++arch++"-"++os
+        bin  = dir </> binn
+    b <- liftIO (isExecutable bin)
+    if b
+      then spawn $ bin ++ " --recompile && " ++ bin ++ " --restart"
+      else spawn $ "xmessage \"User's xmonad binary " ++ bin ++ " not found."
+			     ++ " Compile it manually first.\""
+  where
+    isExecutable :: FilePath -> IO Bool
+    isExecutable f  = catch (getPermissions f >>= return . executable)
+                            (\e -> return (const False (e :: IOError)))
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
 -- resolution is 1680x1050 .

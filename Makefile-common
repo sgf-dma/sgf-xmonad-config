@@ -1,0 +1,192 @@
+
+install		?= install -v -m 640
+install_dir	?= install -v -m 750 -d
+ln		?= ln -v -f -s
+rm		?= rm -v -f
+
+# In make 3.81 $(wildcard) function does not see files built by make. In make
+# 4.0 it does, but this makes make's own $(wildcard) function unreliable as
+# file existence check. Strangely, make's $(realpath) function sees files
+# created by make in both versions. But there is an opinion
+# (https://stackoverflow.com/questions/15048091/gnu-make-wildcard-function-doesnt-find-runtime-generated-files),
+# that make expands all its variables, including functions, before recipe is
+# run and this explains $(wildcard) behavior in 3.81. Though, this does not
+# explain neither $(realpath) nor $(wildcard) in make 4.0 behavior, i'd better
+# use shell equivalents..
+# My $(readlink) function should behave the same way as make's $(realpath)
+# function, i.e. it requires all path components to exist.
+readlink	?= $(shell readlink -e $(1))
+# Since i can't go without coreutils's `readlink` i'll use it for existence
+# test too.
+does_exist	?= $(shell readlink -e $(1))
+
+# Generic install functions install_file() and install_link() check whether
+# target already exists and differs from source and, if so, instruct `install`
+# to create a numbered backup (if backups are enabled, see below).
+
+# Variable: backup_install.
+# Whether to backup installed files, if they differ from new files. Note, that
+# generally install_X() function compares built version of file, which it
+# wants to install, with already installed version. Particularly, it does not
+# try to determine whether current installed version comes from previous git
+# revision. For determining does installed file comes from some revision in
+# git repository i may use something like:
+#
+# 	git rev-list --all | xargs -IREPL git ls-tree REPL -- src/Xsession | uniq \
+# 		| grep $(git hash-object ~/.Xsession)
+#
+# but anyway, this will only work for files installed "as is" (e.g. shell
+# scripts), but not for built files (m4).
+backup_install	?= $(true)
+
+# Variable: force_install.
+# Whether to overwrite installed files, even if they seem identical (from my
+# point of view) to files i want to install. I.e. in normal mode, install_X()
+# functions will overwrite installed files only, if is_differ_X() functions
+# think, they're different from what i want to install. In force mode
+# install_X() will overwrite in any case (and create backup, if enabled,
+# regardless of whether files differ or not).
+force_install	?=
+
+# Function: is_differ_file.
+# Compare content of files, not type (target may be symlink). Files are
+# identical, if target is either file or symlink to file and content (symlink
+# is dereferenced) matches.
+# Assumptions:
+# 1. Source exists.
+# 2. Source is a file (only).
+# Tests:
+#  src		trg		result: "Is differ?"
+#  ne		*		violate 1, not checked
+#  d		*		violate 2, not checked
+#  s		* 		violate 2, not checked
+#  *		ne		Y
+#  f		f		If files content differ
+#  f		s->f		If pointed to file's content differ
+#  f		s->s->f		If pointed to file's content differ
+#  f		s->d		Y
+#  *		d		Y
+#
+# Legend:
+# ne - not exist.
+# d  - directory.
+# f  - file.
+# s  - symlink.
+# *  - any.
+is_differ_file = $(if $(and $(call does_exist,$(2)), $(call isnt_directory,$(2))),$(if $(shell diff -q $(1) $(2) || echo $$?),$(true)),$(true))
+
+# Function: is_differ_link.
+# Require target type and compare fully derefenced pathes. Files are
+# identical, if target is symlink and fully derefenced pathes of source and
+# target points to the *same* *existing* file (or directory). Content of file
+# or directory does not matter.
+# Assumptions:
+# 1. Source exists.
+# Tests:
+#  src		trg		result: "Is differ?"
+#  ne		*		violate 1, not checked
+#  *		ne		Y
+#  *		s->ne		Y . This may not be correct, if e.g.
+#  				source path matches to file pointed to by
+#  				symlink, but that file does not exist. Though,
+#  				if i follow sane install procedure: first
+#  				install files, than create symlinks to them, -
+#  				such thing won't happen.
+#  *		f		Y
+#  *		d		Y
+#  *		s->*		if real pointed to path matches to real
+#  				path of source (real means all symlink
+#  				components in path are resolved and files
+#  				exists).
+#
+# Legend:
+# ne - not exist.
+# d  - directory.
+# f  - file.
+# s  - symlink.
+# *  - any.
+is_differ_link = $(if $(and $(call does_exist,$(2)), $(call is_symlink,$(2))),$(call sne,$(call readlink,$(1)),$(call readlink,$(2))),$(true))
+
+# Function: is_directory and isnt_directory.
+# Is file exists and a directory (or symlink to directory).
+is_directory = $(if $(call does_exist,$(1)/.),$(true))
+isnt_directory = $(call not,$(call is_directory,$(1)))
+
+# Function: is_symlink and isnt_symlink.
+# Is file exists and a symlink to an existing file or directory.
+is_symlink = $(if $(and $(call does_exist,$(1)), $(call sne,$(call readlink,$(dir $(1)))/$(notdir $(1)),$(call readlink,$(1)))),$(true))
+isnt_symlink = $(call not,$(call is_symlink,$(1)))
+
+# Function: real_install_file.
+# Install file overwriting any existing files and making a backup, if existing
+# (dereferenced) file differs from installed.
+# 1 - source file (only file allowed).
+# 2 - target (will be overwritten to file, if is file or symlink to file and
+#   (file pointed to) content differs or is directory).
+define real_install_file
+	$(if $(and $(call does_exist,$(1))
+		, $(call isnt_directory,$(1))
+		, $(call isnt_symlink,$(1)))
+	    , $(if $(or $(force_install),$(call is_differ_file,$(1),$(2)))
+		, $(install) -T \
+		    $(if $(backup_install),--backup=numbered) \
+		    $(1) $(2)
+		, $(warning "real_install_file: Files '$(1)' and '$(2)' are identical. Nothing to do."))
+	    , $(warning "real_install_file: Source '$(1)' not found or it's not a file for target file '$(2)'."))
+endef
+
+# Function: install_file.
+# See real_install_file for requirments and description.
+# Arguments:
+# 1 - source (use first prerequisite, if not specified).
+# 2 - target (use make rule target, if not specified).
+install_file = $(call real_install_file,$(if $(1),$(1),$<),$(if $(2),$(2),$@))
+
+# Function: real_install_link.
+# Install symlink overwriting any existing files and making a backup, if
+# existing file is not a symlink or is a symlink pointing to different path
+# (than source).
+# 1 - any existing source.
+# 2 - target (will be overwritten to symlink, if is symlink and points to
+#   different path or is not a symlink).
+define real_install_link
+	$(if $(call does_exist,$(1))
+	    , $(if $(or $(force_install),$(call is_differ_link,$(1),$(2)))
+		, $(ln) -T \
+		    $(if $(backup_install),--backup=numbered) \
+		    $(1) $(2)
+		, $(warning "real_install_link: Link '$(2)' already points to '$(1)'. Nothing to do."))
+	    , $(warning "real_install_link: No source '$(1)' found for target link '$(2)'."))
+endef
+
+# Function: install_link.
+# See real_install_link for requirments and description.
+# Arguments:
+# 1 - source (use first prerequisite, if not specified).
+# 2 - target (use make rule target, if not specified).
+install_link = $(call real_install_link,$(if $(1),$(1),$<),$(if $(2),$(2),$@))
+
+# Function: backup_files_of.
+# Search for numbered backup files, created by install_X functions, sorting
+# them in increasing version order (oldest first).
+# Note: this shell command is *not* terminated (no newline or semicolon at the
+# end), thus, when using in $(foreach) i need to terminate it explicitly.
+backup_files_of = find $(dir $(1)) -maxdepth 1 -type f -name '$(notdir $(1)).~*~' | sort -V
+
+# Function: list_backup_files.
+# Search for numbered backup files, created by install_X functions, of every
+# argument.
+# Arguments:
+# 1.. - files to search backup files of.
+list_backup_files = @$(foreach f,$(1),$(call backup_files_of,$(f));)
+
+# Function: remove_backup_files.
+# Remove oldest (with the lowest version) numbered backup file, created by
+# install_X functions, of every argument.
+# Arguments:
+# 1.. - files to remove backup files of.
+define remove_backup_files
+	@$(foreach f,$(1),$(call backup_files_of,$(f)) | head -n1 \
+	    | xargs --no-run-if-empty $(rm);)
+endef
+
