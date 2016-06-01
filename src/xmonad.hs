@@ -10,7 +10,7 @@ import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.ManageHelpers (isDialog)
 import XMonad.Layout.ResizableTile
-
+import XMonad.Layout.ThreeColumns
 import Data.List
 
 import Control.Monad
@@ -51,7 +51,7 @@ main                = withHelper $ do
                     {
                     -- Workspace "lock" is for xtrlock only and it is
                     -- inaccessible for workspace switch keys.
-                    workspaces = map show [1..9] ++ ["lock"]
+                    workspaces = ["~"] ++ map show [1..9] ++ ["lock"]
                     , modMask = mod4Mask
                     , focusFollowsMouse = False
                     -- Do not set terminal here: edit `xterm` value instead.
@@ -70,8 +70,12 @@ main                = withHelper $ do
                     }
     handleVnc xcf >>= xmonad
 
-myLayout    = tiled ||| Mirror tiled ||| Full
+myLayout    = tiled ||| Mirror tiled ||| threeCol ||| threeColMid ||| Full
   where
+    threeCol :: ThreeCol Window
+    threeCol    = ThreeCol 1 (3/100) (1/2)
+    threeColMid :: ThreeCol Window
+    threeColMid = ThreeColMid 1 (3/100) (1/2)
     tiled :: ResizableTall Window
     tiled = ResizableTall nmaster delta ratio slaves
     nmaster :: Int
@@ -257,8 +261,9 @@ myKeys XConfig {modMask = m} =
       [ 
       --((m .|. shiftMask, xK_p), spawn "exec gmrun")
         ((m .|. shiftMask, xK_z), lock)
-      , ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
-      , ((0,           xK_Print), spawn "scrot")
+      , ((controlMask, xK_Print), spawn "cd ~/Pictures/ && scrot -u")
+      , ((0,           xK_Print), spawn "cd ~/Pictures/ && scrot -u")
+
       -- For testing two screens.
       --, ((m .|. shiftMask,                 xK_space), layoutScreens 2 testTwoScreen)
       --, ((m .|. controlMask .|. shiftMask, xK_space), rescreen)
@@ -279,6 +284,9 @@ myKeys XConfig {modMask = m} =
       , ((m,  xK_z), sendMessage MirrorExpand)
       , ((m,  xK_q), userRecompile)
       ]
+      ++ [((m .|. t, k), windows $ f i)
+           | (i, k) <- zip (["~"] ++ map show [1..9]) (xK_grave : [xK_1 .. xK_9])
+           , (f, t) <- [(W.view, 0), (W.shift, shiftMask)]]
 
 -- Recompile xmonad binary by calling user's binary instead of xmonad found in
 -- PATH. To support custom build systems (like stack) i need to recompile
