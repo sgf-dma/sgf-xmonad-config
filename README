@@ -17,8 +17,17 @@ Search path:
 2. xmobar is first searched in stack local bin path (~/.local/bin), then in
    PATH. I.e. ~/.local/bin is hardcoded and effectively *prepended* to PATH.
    So, to use system's xmobar do not install xmobar by stack. The one way to
-   do this is mark xmobar as 'extra-dep' in `stack.yaml`:
+   do this is to mark xmobar as 'extra-dep' in `stack.yaml`:
 
-    - location: extra-pkgs/xmobar`.
+    - location: extra-pkgs/xmobar
       extra-dep: true
+
+   or, if you're on master branch:
+
+    - location:
+        git: https://github.com/jaor/xmobar.git
+        commit: 2b165cafcef3ad7f510590fcdbb928ae742ce2f4
+      extra-dep: true
+
+   (note, indentation of 'extra-dep' is the same as of 'location')
 
