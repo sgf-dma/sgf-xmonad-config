@@ -1,8 +1,8 @@
 name:                sgf-xmonad
-version:             0.4.1.1
+version:             1.0.0.0
 synopsis:            sgf's xmonad config
 description:         sgf's xmonda config
-homepage:            http://github.com/sgf-dma/my-xmonad-config
+homepage:            http://github.com/sgf-dma/sgf-xmonad-config
 license:             BSD3
 license-file:        LICENSE
 author:              sgf
@@ -40,4 +40,4 @@ executable xmonad
 
 source-repository head
   type:     git
-  location: https://github.com/sgf-dma/my-xmonad-config
+  location: https://github.com/sgf-dma/sgf-xmonad-config
