@@ -73,8 +73,8 @@ Installation:
     - install_xmobar - only builds and installs xmobar.
 6. xmonad may be build and installed with stack explicitly:
 
-    stack build
-    stack install
+    $ stack build
+    $ stack install
 
    but in that case other files (xmobar configs, Xsession files, symlinks)
    won't be installed. This may be used to recompile xmonad.hs after changes,
@@ -101,7 +101,7 @@ Additiional directories:
 4. xmonad directory `~/.xmonad` and user-defined xmonad config binary
    `~/.xmonad/xmonad-ARCH-OS` are made symlinks properly by `make install`.
 
-Removal.
+Removal:
 1. To clean build:
 
     $ make clean
