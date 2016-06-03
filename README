@@ -1,11 +1,8 @@
-Build dependencies:
-1. GNU `make`.
-2. `git`.
-3. `stack` (http://www.haskellstack.org).
-4. xmobar is recompiled and installed (by stack) as part of this package.
-   Thus, there are two additional (system) dependencies:
-    - xpm.h (libxpm-dev on Debian, Ubuntu).
-    - iwlib library (libiw-dev on Debian, Ubuntu).
+Build dependencies (package names for Debian):
+1. Tools: git, GNU make, stack (http://www.haskellstack.org), gcc, pkg-config.
+2. Libraries: libgmp-dev, libx11-dev, libxrandr-dev, libxft-dev .
+3. xmobar is recompiled and installed (by stack) as part of this package.
+   Thus, additional libraries: libxpm-dev, libiw-dev.
 
 Runtime dependencies:
 1. `xmobar` is used as a panel.
@@ -73,8 +70,8 @@ Installation:
     - install_xmobar - only builds and installs xmobar.
 6. xmonad may be build and installed with stack explicitly:
 
-    stack build
-    stack install
+    $ stack build
+    $ stack install
 
    but in that case other files (xmobar configs, Xsession files, symlinks)
    won't be installed. This may be used to recompile xmonad.hs after changes,
@@ -101,7 +98,7 @@ Additiional directories:
 4. xmonad directory `~/.xmonad` and user-defined xmonad config binary
    `~/.xmonad/xmonad-ARCH-OS` are made symlinks properly by `make install`.
 
-Removal.
+Removal:
 1. To clean build:
 
     $ make clean
