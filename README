@@ -12,6 +12,7 @@ Runtime dependencies:
    not found).
 4. `xterm` is used as default terminal.
 5. `gmrun` is used as launcher.
+6. `xdotool` for switching workspaces by mouse clicks on xmobar.
 
 Search path:
 1. xmonad launch does not have any PATH requirments.
