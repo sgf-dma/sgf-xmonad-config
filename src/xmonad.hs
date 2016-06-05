@@ -115,11 +115,10 @@ myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
 myPrograms :: LayoutClass l Window =>[ProgConfig l]
 myPrograms          = [ addProg feh
-                      , addProg xtermUser, addProg xtermRoot
+                      , addProg xtermUser
                       , addProg firefox
                       , addProg skype
-                      , addProg pidgin
-                      , addProg xclock
+                      , addProg nagstamon
                       ]
 
 -- Session with instant messengers.
@@ -193,21 +192,20 @@ firefox :: Firefox
 firefox             = setA progStartup False
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) "sgf"
+                        . setA (progArgs . firefoxProfile) "default"
                         $ defaultFirefox
 
 skype :: Program NoArgs
 skype               = setA progBin "skype"
                         . setA progStartup False
-                        . setA progWorkspace "4"
+                        . setA progWorkspace "3"
                         . setA progLaunchKey [(0, xK_i), sessionIMKey]
                         $ defaultProgram
 
-pidgin :: Program NoArgs
-pidgin              = setA progBin "pidgin"
-                        . setA progStartup False
-                        . setA progWorkspace "4"
-                        . setA progLaunchKey [(shiftMask, xK_i) , sessionIMKey]
+nagstamon :: Program NoArgs
+nagstamon           = setA progStartup False
+                        . setA progLaunchKey sessionKeys
+                        . setA progBin "nagstamon" 
                         $ defaultProgram
 
 xclock :: Program NoArgs
