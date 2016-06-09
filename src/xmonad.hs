@@ -110,10 +110,10 @@ myFocusHook         = sequence [gmrunFocus, firefoxPassword]
                         (className =? "Iceweasel" <||> className =? "Firefox")
                         <&&> isDialog
 
-myDocks :: LayoutClass l Window => [ProgConfig l]
+myDocks :: [ProgConfig l]
 myDocks     = addDock trayer : map addDock [xmobar, xmobarAlt]
 
-myPrograms :: LayoutClass l Window =>[ProgConfig l]
+myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg feh
                       , addProg xtermUser, addProg xtermRoot
                       , addProg firefox
