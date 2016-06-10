@@ -1,6 +1,7 @@
 Build dependencies (package names for Debian):
 1. Tools: git, GNU make, stack (http://www.haskellstack.org), gcc, pkg-config.
-2. Libraries: libgmp-dev, libx11-dev, libxrandr-dev, libxft-dev .
+2. Libraries: libgmp-dev, libx11-dev, libxrandr-dev, libxft-dev ,
+   libxinerama-dev .
 3. xmobar is recompiled and installed (by stack) as part of this package.
    Thus, additional libraries: libxpm-dev, libiw-dev.
 
@@ -11,6 +12,7 @@ Runtime dependencies:
    not found).
 4. `xterm` is used as default terminal.
 5. `gmrun` is used as launcher.
+6. `xdotool` for switching workspaces by mouse clicks on xmobar.
 
 Search path:
 1. xmonad launch does not have any PATH requirments.
@@ -35,9 +37,18 @@ Installation:
 1. Install `stack`:
    http://docs.haskellstack.org/en/stable/README/#how-to-install
 2. Install GNU `make`.
-3. Install xmonad config:
+3.1. Install xmonad config:
 
     $ make install
+
+3.2. Some step of xmonad restart procedure execve()-s "xmonad" with PATH
+  search enabled. Thus, it should be available in PATH. There are three
+  options to do this, either one will be enough:
+    - Add directory, where xmonad is installed to PATH yourself.
+    - Copy `default-xmonad` binary installed with this package to some
+      directory in default search PATH and rename it to "xmonad" (e.g.
+      /usr/local/bin/xmonad).
+    - Install system's xmonad package.
 
 4. Makefile tries to detect whether files about to install already exist and
    differ. And if so, it makes numbered backup of existing file (see `info
