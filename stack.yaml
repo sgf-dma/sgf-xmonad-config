@@ -13,11 +13,17 @@ resolver: lts-5.5
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
-- location: extra-pkgs/xmobar
+- location:
+    git: https://github.com/jaor/xmobar.git
+    commit: 2b165cafcef3ad7f510590fcdbb928ae742ce2f4
 
-- location: extra-deps/sgf-xmonad-modules
+- location:
+    git: https://github.com/sgf-dma/sgf-xmonad-modules.git
+    commit: 90b93144cd0c0202508a1296173b17f5ff6dae52
   extra-dep: true
-- location: extra-deps/sgf-haskell-common
+- location:
+    git: https://github.com/sgf-dma/sgf-haskell-common.git
+    commit: 2cf055533251b91a01bdb69b3d7436a142dffbda
   extra-dep: true
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
