@@ -19,7 +19,7 @@ packages:
 
 - location:
     git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-    commit: b5e938c60fb0a21170627b58d7f35853c8ebfd49
+    commit: 90b93144cd0c0202508a1296173b17f5ff6dae52
   extra-dep: true
 - location:
     git: https://github.com/sgf-dma/sgf-haskell-common.git
