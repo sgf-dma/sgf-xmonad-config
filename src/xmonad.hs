@@ -4,6 +4,7 @@ import XMonad
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 
+import Data.Tagged
 import Control.Monad
 
 import Sgf.Control.Lens
@@ -22,7 +23,7 @@ main                = withHelper $ do
     let scf = def {programs = programs def ++ myPrograms}
         xcf = session scf
                 . (additionalKeys <*> myKeys)
-                $ (fromSgfXConfig def)
+                $ (def `witness` scf)
                     {
                     -- Do not set terminal here: edit `xterm` value instead.
                     -- Because proper conversion from Program to String (and
