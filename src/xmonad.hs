@@ -87,7 +87,7 @@ firefox :: Firefox
 firefox             = setA progStartup False
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) "sgf"
+                        . setA (progArgs . firefoxProfile) "default"
                         $ defaultFirefox
 
 skype :: Program NoArgs
