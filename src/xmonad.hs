@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 import XMonad
+import qualified XMonad.StackSet as W
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 
@@ -9,6 +10,7 @@ import Control.Monad
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
+import Sgf.XMonad.Focus
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
 import Sgf.XMonad.Restartable.XTerm
@@ -20,7 +22,10 @@ import Sgf.XMonad.Trace
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
-    let scf = def {programs = programs def ++ myPrograms}
+    let scf = def   { programs = programs def ++ myPrograms
+                    , activateFocusHook = newOnCur --> keepFocus
+                    , focusLockKey = Just (0, xK_v)
+                    }
         xcf = session scf
                 . (additionalKeys <*> myKeys)
                 $ (def `witness` scf)
@@ -35,8 +40,13 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
+                    , manageHook = manageFocus activateOnCurrentWs
                     }
     handleVnc xcf >>= xmonad
+
+activateOnCurrentWs :: FocusHook
+activateOnCurrentWs = activated --> asks currentWorkspace >>=
+                        new . unlessFocusLock . doShift
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
