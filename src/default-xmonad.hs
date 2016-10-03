@@ -3,6 +3,7 @@
 import XMonad
 import XMonad.Util.EZConfig (additionalKeys)
 
+import Data.Tagged
 import Control.Monad
 import System.Info
 import System.FilePath
@@ -24,9 +25,10 @@ main                = withHelper $ do
                     ++ "It may be loaded, because user's xmonad binary " ++ bin
                     ++ " was not found or failed to start."
     -- FIXME: Spawn process directly, not through shell.
-    let xcf = session def
+    let scf = def
+        xcf = session scf
                 . (additionalKeys <*> myKeys)
-                $ (fromSgfXConfig def)
+                $ (def `witness` scf)
                     {
                     -- Do not set terminal here: edit `xterm` value instead.
                     -- Because proper conversion from Program to String (and

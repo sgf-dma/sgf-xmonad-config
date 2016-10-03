@@ -19,11 +19,11 @@ packages:
 
 - location:
     git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-    commit: 90b93144cd0c0202508a1296173b17f5ff6dae52
+    commit: 06026f76dd2ec3bf330d6daffa87893913238f22
   extra-dep: true
 - location:
     git: https://github.com/sgf-dma/sgf-haskell-common.git
-    commit: 2cf055533251b91a01bdb69b3d7436a142dffbda
+    commit: 1f6f06438fff22f131def6e74c03e678dd18c3f2
   extra-dep: true
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
