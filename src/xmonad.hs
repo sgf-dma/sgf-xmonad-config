@@ -7,10 +7,12 @@ import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Layout.ResizableTile
 import XMonad.Layout.ThreeColumns
 
+import Data.Tagged
 import Control.Monad
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
+import Sgf.XMonad.Focus
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
 import Sgf.XMonad.Restartable.XTerm
@@ -22,10 +24,13 @@ import Sgf.XMonad.Trace
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
-    let scf = def {programs = programs def ++ myPrograms}
+    let scf = def   { programs = programs def ++ myPrograms
+                    , activateFocusHook = newOnCur --> keepFocus
+                    , focusLockKey = Just (0, xK_v)
+                    }
         xcf = session scf
                 . (additionalKeys <*> myKeys)
-                $ (fromSgfXConfig def)
+                $ (def `witness` scf)
                     {
                     workspaces = ["~"] ++ map show [1..9]
                     , modMask = mod4Mask
@@ -40,6 +45,7 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     , terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
+                    , manageHook = manageFocus activateOnCurrentWs
                     , layoutHook = myLayout
                     }
     handleVnc xcf >>= xmonad
@@ -60,6 +66,10 @@ myLayout    = tiled ||| Mirror tiled ||| threeCol ||| threeColMid ||| Full
     ratio   = 1/2
     slaves :: [Rational]
     slaves  = []
+
+activateOnCurrentWs :: FocusHook
+activateOnCurrentWs = activated --> asks currentWorkspace >>=
+                        new . unlessFocusLock . doShift
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
@@ -100,7 +110,7 @@ firefox :: Firefox
 firefox             = setA progStartup False
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) "sgf"
+                        . setA (progArgs . firefoxProfile) "default"
                         $ defaultFirefox
 
 skype :: Program NoArgs
