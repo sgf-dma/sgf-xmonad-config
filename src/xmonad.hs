@@ -13,6 +13,7 @@ import Control.Monad
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
 import Sgf.XMonad.Focus
+import Sgf.XMonad.Hooks.ManageHelpers
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
 import Sgf.XMonad.Restartable.XTerm
@@ -68,13 +69,16 @@ myLayout    = tiled ||| Mirror tiled ||| threeCol ||| threeColMid ||| Full
     slaves  = []
 
 activateOnCurrentWs :: FocusHook
-activateOnCurrentWs = activated --> do
-                        new $ do
-                          w  <- ask
-                          ls <- liftX (showWindow w)
-                          trace ("Activate window " ++ ls)
-                        asks currentWorkspace >>=
-                          new . unlessFocusLock . doShift
+activateOnCurrentWs = activated --> composeOne
+                        [ new (className =? "Skype") -?> idHook
+                        , return True -?> do
+                            ct <- asks currentWorkspace
+                            new . unlessFocusLock $ do
+                              w  <- ask
+                              ls <- liftX (showWindow w)
+                              trace ("Activate window " ++ ls)
+                              doShift ct
+                        ]
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
