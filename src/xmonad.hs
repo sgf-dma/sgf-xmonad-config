@@ -68,8 +68,13 @@ myLayout    = tiled ||| Mirror tiled ||| threeCol ||| threeColMid ||| Full
     slaves  = []
 
 activateOnCurrentWs :: FocusHook
-activateOnCurrentWs = activated --> asks currentWorkspace >>=
-                        new . unlessFocusLock . doShift
+activateOnCurrentWs = activated --> do
+                        new $ do
+                          w  <- ask
+                          ls <- liftX (showWindow w)
+                          trace ("Activate window " ++ ls)
+                        asks currentWorkspace >>=
+                          new . unlessFocusLock . doShift
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
