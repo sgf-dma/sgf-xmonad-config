@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 import XMonad
-import qualified XMonad.StackSet as W
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 
@@ -45,8 +44,13 @@ main                = withHelper $ do
     handleVnc xcf >>= xmonad
 
 activateOnCurrentWs :: FocusHook
-activateOnCurrentWs = activated --> asks currentWorkspace >>=
-                        new . unlessFocusLock . doShift
+activateOnCurrentWs = activated --> do
+                        new $ do
+                          w  <- ask
+                          ls <- liftX (showWindow w)
+                          trace ("Activate window " ++ ls)
+                        asks currentWorkspace >>=
+                          new . unlessFocusLock . doShift
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser
