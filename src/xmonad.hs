@@ -46,7 +46,7 @@ main                = withHelper $ do
 
 activateOnCurrentWs :: FocusHook
 activateOnCurrentWs = activated --> composeOne
-                        [ new (className =? "Skype") -?> idHook
+                        [ new (className =? "Skype" <||> className =? "Iceweasel" <||> className =? "Firefox") -?> idHook
                         , return True -?> do
                             ct <- asks currentWorkspace
                             new . unlessFocusLock $ do
