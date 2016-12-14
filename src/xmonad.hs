@@ -9,7 +9,7 @@ import Control.Monad
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
-import Sgf.XMonad.Focus
+import Sgf.XMonad.Hooks.Focus
 import Sgf.XMonad.Hooks.ManageHelpers
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
