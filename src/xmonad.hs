@@ -10,6 +10,7 @@ import Control.Monad
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
 import Sgf.XMonad.Hooks.Focus
+import Sgf.XMonad.Hooks.EwmhDesktops
 import Sgf.XMonad.Hooks.ManageHelpers
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
@@ -40,16 +41,16 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
-                    , manageHook = manageFocus activateOnCurrentWs
+                    , manageHook = activateOnCurrentWs
                     }
     handleVnc xcf >>= xmonad
 
-activateOnCurrentWs :: FocusHook
+activateOnCurrentWs :: ManageHook
 activateOnCurrentWs = activated --> composeOne
-                        [ new (className =? "Skype") -?> idHook
+                        [ (className =? "Skype") -?> idHook
                         , return True -?> do
-                            ct <- asks currentWorkspace
-                            new . unlessFocusLock $ do
+                            ct <- currentWs
+                            unlessFocusLock $ do
                               w  <- ask
                               ls <- liftX (showWindow w)
                               trace ("Activate window " ++ ls)
