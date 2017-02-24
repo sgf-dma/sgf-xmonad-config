@@ -12,10 +12,9 @@ Config { font = "-*-Fixed-*-R-Normal-*-13-*-*-*-*-*-*-*"
                     , Run UnsafeStdinReader
 		    , Run Kbd [("us", "US"), ("ru", "RU")]
 		    , Run BatteryP ["AC", "BAT0"] ["-p", "3", "-t", "<acstatus>", "-L", "30", "-H", "90", "-l", "red", "-n", "blue", "--", "-O", "AC: <left>%/<timeleft>", "-i", "AC", "-o", "<fc=blue>Batt:</fc> <left>%/<timeleft>"] 10
-		    , Run Wireless "wlan0" ["-m", "3", "-t", "<quality>", "-L", "40", "-H", "70", "-l", "red", "-n", "blue"] 10
 		    , Run DynNetwork ["-m", "3", "-t", "<dev>: <rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
        , alignSep = "}{"
-       , template = "%UnsafeStdinReader% } %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork%, %wlan0wi% * %battery% "
+       , template = "%UnsafeStdinReader% } %extdate% * %kbd% { Cpu: %multicpu% %coretemp% %loadavg% Mem: %memory%/%swap% * %dynnetwork% * %battery% "
        }
