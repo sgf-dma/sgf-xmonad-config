@@ -59,6 +59,7 @@ activateOnCurrentWs = activated --> composeOne
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
+                      , addProg nmApplet
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
@@ -74,7 +75,7 @@ sessionKeys :: [(ButtonMask, KeySym)]
 sessionKeys         = [(0, xK_s), sessionIMKey]
 
 -- Programs {{{
-
+-- At startup.
 -- With such definition, `xterm == xtermUser`, but that should not matter,
 -- because 'xterm' launched untracked using `runP` (and, thus,  should not
 -- appear in Extensible State).
@@ -92,6 +93,12 @@ xtermRoot           = setA progWorkspace "3"
                         . setA progLaunchKey ((shiftMask, xK_x) : sessionKeys)
                         $ defaultXTerm
 
+nmApplet :: Program NoArgs
+nmApplet            = setA progBin "nm-applet"
+                        . setA progStartup True
+                        $ defaultProgram
+
+-- By key.
 firefox :: Firefox
 firefox             = setA progStartup False
                         . setA progWorkspace "1"
