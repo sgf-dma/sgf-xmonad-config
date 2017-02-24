@@ -59,7 +59,7 @@ activateOnCurrentWs = activated --> composeOne
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
-                      , addProg nmApplet
+                      , addProg nmApplet, addProg parcellite
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
@@ -95,6 +95,11 @@ xtermRoot           = setA progWorkspace "3"
 
 nmApplet :: Program NoArgs
 nmApplet            = setA progBin "nm-applet"
+                        . setA progStartup True
+                        $ defaultProgram
+
+parcellite :: Program NoArgs
+parcellite          = setA progBin "parcellite"
                         . setA progStartup True
                         $ defaultProgram
 
