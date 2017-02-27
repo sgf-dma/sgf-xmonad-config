@@ -11,10 +11,10 @@ Config { font = "-*-Fixed-*-R-Normal-*-20-*-*-*-*-*-*-*"
                     , Run Date "%_d %b %_H:%M %a" "date" 10
                     , Run UnsafeStdinReader
 		    , Run Kbd [("us", "US"), ("ru", "RU")]
-		    , Run BatteryP ["AC", "BAT0"] ["-p", "2", "-t", "<acstatus>", "-L", "30", "-H", "90", "-l", "red", "-n", "blue", "--", "-O", "[AC: <left>%/<timeleft>]", "-i", "[AC]", "-o", "[<fc=blue>Batt:</fc> <left>%/<timeleft>]"] 10
+		    , Run BatteryP ["AC", "BAT0"] ["-p", "3", "-t", "<acstatus>", "-L", "30", "-l", "red", "--", "-O", "", "-i", "", "-o", "<fc=blue>Batt: <left>%</fc>"] 10
 		    , Run DynNetwork ["-m", "3", "-t", "<dev>: <rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
        , alignSep = "}{"
-       , template = "%UnsafeStdinReader% } { %kbd% %battery% %date%"
+       , template = "%UnsafeStdinReader% } { %battery% : %date% : %kbd%"
        }
