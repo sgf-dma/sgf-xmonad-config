@@ -41,21 +41,9 @@ main                = withHelper $ do
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
                     --, logHook = traceWindowSet
-                    , manageHook = activateOnCurrentWs
+                    , manageHook = not <$> (className =? "Skype") --> activateOnCurrentWs
                     }
     handleVnc xcf >>= xmonad
-
-activateOnCurrentWs :: ManageHook
-activateOnCurrentWs = activated --> composeOne
-                        [ (className =? "Skype") -?> idHook
-                        , return True -?> do
-                            ct <- currentWs
-                            unlessFocusLock $ do
-                              w  <- ask
-                              ls <- liftX (showWindow w)
-                              trace ("Activate window " ++ ls)
-                              doShift ct
-                        ]
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
