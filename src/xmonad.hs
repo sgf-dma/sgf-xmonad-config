@@ -22,7 +22,7 @@ main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
     let scf = def   { programs = programs def ++ myPrograms
-                    , activateFocusHook = newOnCur --> keepFocus
+                    , activateFocusHook = manageFocus (newOnCur --> keepFocus) <+> activateOnCurrentWs
                     , focusLockKey = Just (0, xK_v)
                     }
         xcf = session scf
@@ -38,10 +38,6 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
-                    , logHook = do
-                        activateLogHook $ not <$> (className =? "Skype")
-                            --> activateOnCurrentWs
-                        logHook def
                     }
     handleVnc xcf >>= xmonad
 
