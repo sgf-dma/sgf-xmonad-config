@@ -38,8 +38,10 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
-                    --, logHook = traceWindowSet
-                    , manageHook = not <$> (className =? "Skype") --> activateOnCurrentWs
+                    , logHook = do
+                        activateLogHook $ not <$> (className =? "Skype")
+                            --> activateOnCurrentWs
+                        logHook def
                     }
     handleVnc xcf >>= xmonad
 
