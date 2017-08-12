@@ -3,15 +3,13 @@
 import XMonad
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
+import XMonad.Hooks.Focus
 
 import Data.Tagged
 import Control.Monad
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
-import Sgf.XMonad.Hooks.Focus
-import Sgf.XMonad.Hooks.EwmhDesktops
-import Sgf.XMonad.Hooks.ManageHelpers
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
 import Sgf.XMonad.Restartable.XTerm
