@@ -19,10 +19,11 @@ packages:
   extra-dep: true
 - location: extra-deps/sgf-haskell-common
   extra-dep: true
+- location: extra-deps/xmonad-contrib
+  extra-dep: true
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - X11-xft-0.3.1
-- xmonad-contrib-0.13
 - xmonad-entryhelper-0.1.0.0
 
 # Override default flag values for local packages and extra-deps
