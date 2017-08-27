@@ -4,9 +4,11 @@ import XMonad
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
 import XMonad.Hooks.Focus
+import qualified XMonad.StackSet as W
 
 import Data.Tagged
 import Control.Monad
+import XMonad.Hooks.EwmhDesktops
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
@@ -16,14 +18,18 @@ import Sgf.XMonad.Restartable.XTerm
 import Sgf.XMonad.VNC
 import Sgf.XMonad.Util.EntryHelper
 import Sgf.XMonad.Trace
+import XMonad.Actions.SpawnOn
 
 
 main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
     let scf = def   { programs = programs def ++ myPrograms
-                    , activateFocusHook = manageFocus (newOnCur --> keepFocus) <+> activateOnCurrentWs
+                    -- , activateFocusHook = manageFocus (newOnCur --> keepFocus) <+> activateOnCurrentWs
+                   -- , activateFocusHook = manageFocus (newOnCur --> keepFocus) <+> manageFocus (liftQuery (doShift "lock"))
+                   , activateFocusHook = manageFocus firefoxEsr
                     , focusLockKey = Just (0, xK_v)
+                   -- , anotherWorkspace = const "1"
                     }
         xcf = session scf
                 . (additionalKeys <*> myKeys)
@@ -38,8 +44,12 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
+                   , manageHook = manageSpawn <+> manageHook def
                     }
     handleVnc xcf >>= xmonad
+
+firefoxEsr :: FocusHook
+firefoxEsr = new (className =? "Firefox-esr") --> new (doShift "lock")
 
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
@@ -151,6 +161,7 @@ myKeys XConfig {modMask = m} =
       , ( (m .|. shiftMask, xK_Return), void (runP xterm))
       , ( (m .|. shiftMask, xK_f)
         , spawn "exec firefox --new-instance -ProfileManager")
+      , ( (m .|. shiftMask, xK_0), spawnOn "lock" "xterm")
       ]
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
