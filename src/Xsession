@@ -17,7 +17,6 @@ if [ -r ~/.fehbg ]; then
 else
     feh='xsetroot -grey'
 fi
-run_cmd wpa_gui
 
 xkb_ctrl_esc_to_super
 
