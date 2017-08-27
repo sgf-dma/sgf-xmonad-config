@@ -3,14 +3,13 @@
 import XMonad
 import XMonad.Layout.LayoutScreens
 import XMonad.Util.EZConfig (additionalKeys)
+import XMonad.Hooks.Focus
 
 import Data.Tagged
 import Control.Monad
 
 import Sgf.Control.Lens
 import Sgf.XMonad.Config
-import Sgf.XMonad.Focus
-import Sgf.XMonad.Hooks.ManageHelpers
 import Sgf.XMonad.Restartable
 import Sgf.XMonad.Restartable.Firefox
 import Sgf.XMonad.Restartable.XTerm
@@ -23,7 +22,8 @@ main :: IO ()
 main                = withHelper $ do
     -- FIXME: Spawn process directly, not through shell.
     let scf = def   { programs = programs def ++ myPrograms
-                    , activateFocusHook = newOnCur --> keepFocus
+                    , activateFocusHook =
+                        manageFocus (newOnCur --> keepFocus) <+> activateFH
                     , focusLockKey = Just (0, xK_v)
                     }
         xcf = session scf
@@ -39,30 +39,20 @@ main                = withHelper $ do
                     -- to avoid conversion issues i just throw away all
                     -- arguments: at least it's safe..
                     terminal = viewA progBin xterm
-                    --, logHook = traceWindowSet
-                    , manageHook = manageFocus activateOnCurrentWs
                     }
     handleVnc xcf >>= xmonad
 
-activateOnCurrentWs :: FocusHook
-activateOnCurrentWs = activated --> composeOne
-                        [ new (className =? "Skype") -?> idHook
-                        , return True -?> do
-                            ct <- asks currentWorkspace
-                            new . unlessFocusLock $ do
-                              w  <- ask
-                              ls <- liftX (showWindow w)
-                              trace ("Activate window " ++ ls)
-                              doShift ct
-                        ]
-
 myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
+                      , addProg nmApplet, addProg parcellite
                       , addProg firefox
                       , addProg skype
                       , addProg pidgin
                       , addProg xclock
                       ]
+
+activateFH :: ManageHook
+activateFH          = not <$> className =? "Skype" --> activateOnCurrentWs
 
 -- Session with instant messengers.
 sessionIMKey :: (ButtonMask, KeySym)
@@ -73,7 +63,7 @@ sessionKeys :: [(ButtonMask, KeySym)]
 sessionKeys         = [(0, xK_s), sessionIMKey]
 
 -- Programs {{{
-
+-- At startup.
 -- With such definition, `xterm == xtermUser`, but that should not matter,
 -- because 'xterm' launched untracked using `runP` (and, thus,  should not
 -- appear in Extensible State).
@@ -91,6 +81,17 @@ xtermRoot           = setA progWorkspace "3"
                         . setA progLaunchKey ((shiftMask, xK_x) : sessionKeys)
                         $ defaultXTerm
 
+nmApplet :: Program NoArgs
+nmApplet            = setA progBin "nm-applet"
+                        . setA progStartup True
+                        $ defaultProgram
+
+parcellite :: Program NoArgs
+parcellite          = setA progBin "parcellite"
+                        . setA progStartup True
+                        $ defaultProgram
+
+-- By key.
 firefox :: Firefox
 firefox             = setA progStartup False
                         . setA progWorkspace "1"

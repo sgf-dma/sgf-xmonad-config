@@ -7,6 +7,7 @@ t.*
 dist/
 build/
 .stack-work/
+sgf-xmonad.cabal
 
 # Any other..
 nohup.out
