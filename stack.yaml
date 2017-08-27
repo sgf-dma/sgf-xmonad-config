@@ -13,7 +13,9 @@ resolver: lts-8.24
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
-- location: extra-pkgs/xmobar
+- location:
+    git: https://github.com/jaor/xmobar.git
+    commit: fcade764395401097b8907d230bc85c2437b65b5
 
 - location:
     git: https://github.com/sgf-dma/sgf-xmonad-modules.git
