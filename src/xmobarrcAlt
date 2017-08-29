@@ -8,7 +8,7 @@ Config { font = "-*-Fixed-*-R-Normal-*-15-*-*-*-*-*-*-*"
                     , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
                     , Run Memory ["-p", "3", "-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
                     , Run Swap ["-p", "3", "-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
-		    , Run BatteryP ["AC", "BAT0"] ["-p", "2", "-t", "<acstatus>", "-L", "30", "-l", "red", "--", "-O", "<fc=darkred>AC:</fc> <left>%/<timeleft>", "-i", "<fc=darkred>[AC]</fc>", "-o", "<fc=darkred>Batt:</fc> <left>%/<timeleft>"] 10
+		    , Run BatteryP ["AC", "BAT0"] ["-p", "2", "-t", "<acstatus>", "-L", "30", "-l", "red", "--", "-O", "<fc=darkred>AC:</fc> <left>%/<timeleft>]", "-i", "<fc=darkred>[AC]</fc>", "-o", "<fc=darkred>Batt:</fc> <left>%/<timeleft>"] 10
                     , Run DynNetwork ["-m", "3", "-t", "<fc=darkred><dev></fc>: <rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
