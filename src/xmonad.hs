@@ -48,6 +48,7 @@ myPrograms          = [ addProg xtermUser, addProg xtermRoot
                       , addProg firefox
                       , addProg firefoxPM
                       , addProg skype
+                      , addProg nagstamon
                       -- , addProg pidgin
                       , addProg xclock
                       ]
@@ -114,6 +115,12 @@ skype               = setA progBin "skype"
                         . setA progStartup False
                         . setA progWorkspace "4"
                         . setA progLaunchKey [(0, xK_i), sessionIMKey]
+                        $ defaultProgram
+
+nagstamon :: Program NoArgs
+nagstamon           = setA progStartup False
+                        . setA progLaunchKey sessionKeys
+                        . setA progBin "nagstamon"
                         $ defaultProgram
 
 pidgin :: Program NoArgs
