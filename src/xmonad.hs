@@ -46,8 +46,10 @@ myPrograms :: [ProgConfig l]
 myPrograms          = [ addProg xtermUser, addProg xtermRoot
                       , addProg nmApplet, addProg parcellite
                       , addProg firefox
+                      , addProg firefoxPM
                       , addProg skype
-                      , addProg pidgin
+                      , addProg nagstamon
+                      -- , addProg pidgin
                       , addProg xclock
                       ]
 
@@ -94,16 +96,31 @@ parcellite          = setA progBin "parcellite"
 -- By key.
 firefox :: Firefox
 firefox             = setA progStartup False
+                        . setA progBin "/home/dmitriym/Documents/3rd/firefox/firefox"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) "default"
+                        . setA (progArgs . firefoxProfile) (FfProfile "default-esr")
                         $ defaultFirefox
+
+firefoxPM :: Firefox
+firefoxPM           = setA progLaunchKey [(shiftMask, xK_f)]
+                        . setA progWorkspace ""
+                        . setA (progArgs . firefoxNewInstance) True
+                        . setA (progArgs . firefoxNoRemote) True
+                        . setA (progArgs . firefoxProfile) FfProfileManager
+                        $ firefox
 
 skype :: Program NoArgs
 skype               = setA progBin "skype"
                         . setA progStartup False
                         . setA progWorkspace "4"
                         . setA progLaunchKey [(0, xK_i), sessionIMKey]
+                        $ defaultProgram
+
+nagstamon :: Program NoArgs
+nagstamon           = setA progStartup False
+                        . setA progLaunchKey sessionKeys
+                        . setA progBin "nagstamon"
                         $ defaultProgram
 
 pidgin :: Program NoArgs
@@ -141,7 +158,7 @@ tracePrograms       = do
 -- dock, if any, defined in that dock definition (see above).
 myKeys :: XConfig l -> [((ButtonMask, KeySym), X ())]
 myKeys XConfig {modMask = m} =
-      [ 
+      [
       --((m .|. shiftMask, xK_p), spawn "exec gmrun")
       ((controlMask, xK_Print), spawn "sleep 0.2; scrot -s")
       , ((0,           xK_Print), spawn "scrot")
@@ -153,8 +170,6 @@ myKeys XConfig {modMask = m} =
       -- Use Program `xterm` to determine which terminal to launch instead of
       -- XConfig 'terminal' record.
       , ( (m .|. shiftMask, xK_Return), void (runP xterm))
-      , ( (m .|. shiftMask, xK_f)
-        , spawn "exec firefox --new-instance -ProfileManager")
       ]
 
 -- Two screens dimensions for layoutScreen. Two xmobars have height 17, total
