@@ -3,16 +3,10 @@ Config { font = "-*-Fixed-*-R-Normal-*-20-*-*-*-*-*-*-*"
        , fgColor = "black"
        , position = TopW L 90
        , overrideRedirect = False
-       , commands = [ Run MultiCpu ["-p", "3", "-S", "True", "-t", "<autototal>", "-L","10","-H","70","-n","blue","-h","red"] 10
-		    , Run CoreTemp ["-p", "3", "-t", "<core0>C/<core1>C", "-L", "45", "-H", "50", "-n", "blue", "-h", "red"] 10
-		    , Run Com "cut" ["-d ", "-f1,2", "/proc/loadavg"] "loadavg" 10
-                    , Run Memory ["-p", "3", "-t","<usedratio>%", "-L", "40", "-n", "blue", "-H", "70", "-h", "red"] 10
-                    , Run Swap ["-p", "3", "-t", "<usedratio>%", "-L", "1", "-n", "red"] 10
-                    , Run Date "%_d %b %_H:%M %a" "date" 10
+       , commands = [ Run Date "%a %_d %b %_H:%M" "date" 10
                     , Run UnsafeStdinReader
 		    , Run Kbd [("us", "US"), ("ru", "RU")]
 		    , Run BatteryP ["AC", "BAT0"] ["-p", "3", "-t", "<acstatus>", "-L", "30", "-l", "red", "--", "-O", "", "-i", "", "-o", "<fc=blue>Batt: <left>%</fc>"] 10
-		    , Run DynNetwork ["-m", "3", "-t", "<dev>: <rx>KB/<tx>KB"] 10
                     ]
        , sepChar = "%"
        , alignSep = "}{"
