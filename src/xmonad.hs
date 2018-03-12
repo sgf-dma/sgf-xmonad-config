@@ -47,7 +47,6 @@ myPrograms          = [ addProg xtermUser
                       , addProg nmApplet, addProg parcellite
                       , addProg firefox
                       , addProg firefoxPM
-                      , addProg skype
                       , addProg nagstamon
                       ]
 
@@ -101,7 +100,7 @@ firefox             = setA progStartup False
                         . setA progBin "/home/domovoy/3rd/firefox/firefox"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) (FfProfile "default-esr")
+                        . setA (progArgs . firefoxProfile) (FfProfile "default")
                         $ defaultFirefox
 
 firefoxPM :: Firefox
