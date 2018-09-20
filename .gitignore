@@ -9,6 +9,12 @@ build/
 .stack-work/
 sgf-xmonad.cabal
 
+# Vim
+.*.swo
+.*.swp
+
 # Any other..
 nohup.out
 xmonad.errors
+xmonad.state
+xmonad-x86_64-linux
