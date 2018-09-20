@@ -16,23 +16,18 @@ packages:
 - location:
     git: https://github.com/jaor/xmobar.git
     commit: fcade764395401097b8907d230bc85c2437b65b5
+  extra-dep: false
 
-- location:
-    git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-    commit: d37d69cc6780a281a6e8e74be52080b95b6b058e
-  extra-dep: true
-- location:
-    git: https://github.com/sgf-dma/sgf-haskell-common.git
-    commit: d8e65231a4337e8385f9d94b5b68ccff012f46c7
-  extra-dep: true
-- location:
-    git: https://github.com/sgf-dma/xmonad-contrib.git
-    commit: b1e4f9ea916c31678058d90b0b996dbaa10efc3e
-  extra-dep: true
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - X11-xft-0.3.1
 - xmonad-entryhelper-0.1.0.0
+- git: https://github.com/sgf-dma/sgf-xmonad-modules.git
+  commit: d37d69cc6780a281a6e8e74be52080b95b6b058e
+- git: https://github.com/sgf-dma/sgf-haskell-common.git
+  commit: d8e65231a4337e8385f9d94b5b68ccff012f46c7
+- git: https://github.com/sgf-dma/xmonad-contrib.git
+  commit: b1e4f9ea916c31678058d90b0b996dbaa10efc3e
 
 # Override default flag values for local packages and extra-deps
 flags:
