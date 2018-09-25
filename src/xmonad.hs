@@ -97,7 +97,7 @@ parcellite          = setA progBin "parcellite"
 -- By key.
 firefox :: Firefox
 firefox             = setA progStartup False
-                        . setA progBin "/home/domovoy/3rd/firefox/firefox"
+                        -- . setA progBin "/home/domovoy/3rd/firefox/firefox"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
                         . setA (progArgs . firefoxProfile) (FfProfile "default")
