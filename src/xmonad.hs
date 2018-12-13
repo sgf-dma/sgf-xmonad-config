@@ -96,19 +96,21 @@ parcellite          = setA progBin "parcellite"
 -- By key.
 firefox :: Firefox
 firefox             = setA progStartup False
-                        . setA progBin "/home/dmitriym/Documents/3rd/firefox/firefox"
+                        . setA progBin "firefox-52esr"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) (FfProfile "default-esr")
+                        . setA (progArgs . firefoxProfile) (FfProfile "default-52esr")
                         $ defaultFirefox
 
 firefoxPM :: Firefox
-firefoxPM           = setA progLaunchKey [(shiftMask, xK_f)]
+firefoxPM           = setA progStartup False
+                        . setA progBin "firefox-52esr"
                         . setA progWorkspace ""
+                        . setA progLaunchKey [(shiftMask, xK_f)]
                         . setA (progArgs . firefoxNewInstance) True
                         . setA (progArgs . firefoxNoRemote) True
                         . setA (progArgs . firefoxProfile) FfProfileManager
-                        $ firefox
+                        $ defaultFirefox
 
 skype :: Program NoArgs
 skype               = setA progBin "skype"
