@@ -94,13 +94,13 @@ parcellite          = setA progBin "parcellite"
                         $ defaultProgram
 
 -- By key.
-firefox :: Firefox
-firefox             = setA progStartup False
-                        . setA progBin "firefox-52esr"
+firefox :: Program [String]
+firefox              = setA progStartup False
+                        . setA progBin "gtk-launch"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA (progArgs . firefoxProfile) (FfProfile "default-52esr")
-                        $ defaultFirefox
+                        . setA progArgs ["firefox-52esr"]
+                        $ defaultProgram
 
 firefoxPM :: Firefox
 firefoxPM           = setA progStartup False
