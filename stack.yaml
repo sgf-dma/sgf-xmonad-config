@@ -8,7 +8,7 @@ user-message: ! 'Warning: Specified resolver could not satisfy all dependencies.
 '
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-8.24
+resolver: lts-12.20
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -20,14 +20,14 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- X11-xft-0.3.1
 - xmonad-entryhelper-0.1.0.0
 - git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-  commit: d37d69cc6780a281a6e8e74be52080b95b6b058e
+  commit: b8f2f9194d98b110bd16765e5e822899cd5943be
 - git: https://github.com/sgf-dma/sgf-haskell-common.git
   commit: d8e65231a4337e8385f9d94b5b68ccff012f46c7
 - git: https://github.com/sgf-dma/xmonad-contrib.git
-  commit: b1e4f9ea916c31678058d90b0b996dbaa10efc3e
+  commit: 0c084d3d22929d598917442466f2db6e621e1c57
+- xmonad-0.15
 
 # Override default flag values for local packages and extra-deps
 flags:
