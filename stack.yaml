@@ -14,6 +14,7 @@ resolver: lts-12.20
 packages:
 - '.'
 - extra-pkgs/xmobar
+  extra-dep: false
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
