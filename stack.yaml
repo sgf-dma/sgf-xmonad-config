@@ -17,13 +17,10 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- X11-xft-0.3.1
 - xmonad-entryhelper-0.1.0.0
 - extra-deps/sgf-xmonad-modules
 - extra-deps/sgf-haskell-common
 - extra-deps/xmonad-contrib
-- iwlib-0.1.0
-- parsec-numbers-0.1.0
 - xmonad-0.15
 
 # Override default flag values for local packages and extra-deps
