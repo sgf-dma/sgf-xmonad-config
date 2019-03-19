@@ -17,9 +17,6 @@ main = do
         let xcf = def
                     { modMask = mod4Mask
                     , layoutHook = avoidStruts (layoutHook def)
-                    -- Lower dock before unmanaging. The position of
-                    -- `lowerDock` in `ManageHook` does not matter, because it
-                    -- only runs X actions.
                     , manageHook = addDock <+> manageDocks <+> manageHook def
                     , handleEventHook = delDock <+> fullscreenEventHook <+> docksEventHook <+> handleEventHook def
                     , startupHook = docksStartupHook <+> startupHook def
