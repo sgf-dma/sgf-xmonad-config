@@ -4,10 +4,13 @@ import XMonad.Util.EZConfig
 import XMonad.Util.DebugWindow
 import XMonad.Hooks.DebugStack
 import XMonad.Hooks.ManageDocks
-import qualified XMonad.StackSet as W
 import XMonad.Hooks.EwmhDesktops
+import XMonad.Hooks.ManageHelpers
+import qualified XMonad.Util.ExtensibleState as XS
+import XMonad.Util.WindowProperties (getProp32s)
 
 import Data.List
+import Data.Monoid
 
 main :: IO ()
 main = do
@@ -17,9 +20,10 @@ main = do
                     -- Lower dock before unmanaging. The position of
                     -- `lowerDock` in `ManageHook` does not matter, because it
                     -- only runs X actions.
-                    , manageHook = lowerDock <+> manageDocks <+> manageHook def
-                    , handleEventHook = fullscreenEventHook <+> docksEventHook <+> handleEventHook def
+                    , manageHook = addDock <+> manageDocks <+> manageHook def
+                    , handleEventHook = delDock <+> fullscreenEventHook <+> docksEventHook <+> handleEventHook def
                     , startupHook = docksStartupHook <+> startupHook def
+                    , logHook = logDL >> logHook def
                     }
                     `additionalKeys`
                     [ ((mod4Mask, xK_b), sendMessage ToggleStruts)
@@ -42,29 +46,89 @@ logH    = do
     ls <- mapM debugWindow ts
     trace (intercalate "\n" ls)
 
--- | Restack dock under lowest managed window.
-lowerDock :: ManageHook
-lowerDock = checkDock --> do
-    w <- ask
-    mlw <- liftX $ findLowest
-    case mlw of
-      Just lw   -> liftX $ do
-        d <- asks display
-        s <- debugWindow lw
-        trace "_Before_ restacking dock:"
-        logH
-        trace $ "Lowest managed window: " ++ s
-        liftIO $ restackWindows d [lw, w]
-        trace "_After_ restack dock:"
-        logH
-        return idHook
-      Nothing   -> return idHook
+data DockT  = DockA Window
+            | DesktopA Window
+  deriving (Show, Eq)
 
--- | Find lowest managed window.
-findLowest :: X (Maybe Window)
-findLowest  = withWindowSet $ \ws -> do
-    d <- asks display
-    r <- asks theRoot
-    (_, _, ts) <- liftIO $ queryTree d r
-    return (find (`W.member` ws) ts)
+checkDesktop :: Query Bool
+checkDesktop = ask >>= \w -> liftX $ do
+    desk <- getAtom "_NET_WM_WINDOW_TYPE_DESKTOP"
+    mbr <- getProp32s "_NET_WM_WINDOW_TYPE" w
+    case mbr of
+        Just rs -> return $ any (== desk) (map fromIntegral rs)
+        _       -> return False
+
+newtype DockList    = DockList [DockT]
+  deriving (Show)
+
+findDock :: Window -> [DockT] -> Maybe DockT
+findDock w    = find go
+  where
+    go :: DockT -> Bool
+    go (DockA x)    = w == x
+    go (DesktopA x) = w == x
+
+getPanels :: DockList -> [DockT]
+getPanels (DockList ds) = filter go ds
+  where
+    go (DockA _)    = True
+    go _            = False
+
+getDesktops :: DockList -> [DockT]
+getDesktops (DockList ds) = filter go ds
+  where
+    go (DesktopA _) = True
+    go _            = False
+
+unDock :: DockT -> Window
+unDock (DockA x)    = x
+unDock (DesktopA x) = x
+
+instance ExtensionClass DockList where
+    initialValue = DockList []
+
+
+addDesktop :: MaybeManageHook
+addDesktop    = checkDesktop  -?> do
+    w <- ask
+    liftX $ XS.modify (\(DockList zs) -> DockList (DesktopA w : zs))
+    return idHook
+
+addPanel :: MaybeManageHook
+addPanel    = checkDock  -?> do
+    w <- ask
+    liftX $ XS.modify (\(DockList zs) -> DockList (DockA w : zs))
+    return idHook
+
+addDock :: ManageHook
+addDock   = checkDock --> do
+    composeOne [addDesktop, addPanel]
+    liftX $ do
+      dl <- XS.get
+      let ds = getDesktops dl
+          ps = getPanels dl
+          rs = map unDock (ps ++ ds)
+      d <- asks display
+      trace "_Before_ lowering dock:"
+      logH
+      liftIO $ do
+        lowerWindow d (head rs)
+        restackWindows d rs
+      trace "_After_ lowering dock:"
+      logH
+      return mempty
+
+delDock :: Event -> X All
+delDock (DestroyWindowEvent {ev_window = w}) = do
+    DockList ds <- XS.get
+    let md = w `findDock` ds
+    case md of
+      Just d    -> XS.put (DockList (d `delete` ds)) >> return mempty
+      Nothing   -> return mempty
+delDock _ = return mempty
+
+logDL :: X ()
+logDL   = do
+    DockList ds <- XS.get
+    trace $ "Docks list: " ++ intercalate ", " (map show ds)
 
