@@ -19,7 +19,7 @@ packages:
 extra-deps:
 - xmonad-entryhelper-0.1.0.0
 - git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-  commit: b8f2f9194d98b110bd16765e5e822899cd5943be
+  commit: ae2d90ff6a4b5e16cd946e58c5f6c661194f2525
 - git: https://github.com/sgf-dma/sgf-haskell-common.git
   commit: d8e65231a4337e8385f9d94b5b68ccff012f46c7
 - git: https://github.com/sgf-dma/xmonad-contrib.git
