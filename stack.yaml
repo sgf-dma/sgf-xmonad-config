@@ -25,6 +25,8 @@ extra-deps:
 - git: https://github.com/sgf-dma/xmonad-contrib.git
   commit: 0c084d3d22929d598917442466f2db6e621e1c57
 - xmonad-0.15
+- iwlib-0.1.0
+- parsec-numbers-0.1.0
 
 # Override default flag values for local packages and extra-deps
 flags:
