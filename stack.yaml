@@ -13,10 +13,7 @@ resolver: lts-12.20
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
-- location:
-    git: https://github.com/jaor/xmobar.git
-    commit: fcade764395401097b8907d230bc85c2437b65b5
-  extra-dep: false
+- extra-pkgs/xmobar
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
