@@ -99,12 +99,12 @@ firefox              = setA progStartup False
                         . setA progBin "gtk-launch"
                         . setA progWorkspace "1"
                         . setA progLaunchKey ((0, xK_f) : sessionKeys)
-                        . setA progArgs ["firefox-52esr"]
+                        . setA progArgs ["firefox-52.9.0esr"]
                         $ defaultProgram
 
 firefoxPM :: Firefox
 firefoxPM           = setA progStartup False
-                        . setA progBin "firefox-52esr"
+                        . setA progBin "firefox-52.9.0esr"
                         . setA progWorkspace ""
                         . setA progLaunchKey [(shiftMask, xK_f)]
                         . setA (progArgs . firefoxNewInstance) True
