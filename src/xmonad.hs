@@ -109,7 +109,6 @@ firefoxPM           = setA progStartup False
                         . setA progBin "firefox-esr"
                         . setA progWorkspace ""
                         . setA progLaunchKey [(shiftMask, xK_f)]
-                        . setA (progArgs . firefoxNewInstance) True
                         . setA (progArgs . firefoxNoRemote) True
                         . setA (progArgs . firefoxProfile) FfProfileManager
                         $ defaultFirefox
@@ -127,7 +126,6 @@ firefoxEsrPM        = setA progStartup False
                         . setA progBin "firefox-52.9.0esr"
                         . setA progWorkspace ""
                         . setA progLaunchKey [(shiftMask, xK_e)]
-                        . setA (progArgs . firefoxNewInstance) True
                         . setA (progArgs . firefoxNoRemote) True
                         . setA (progArgs . firefoxProfile) FfProfileManager
                         $ defaultFirefox
