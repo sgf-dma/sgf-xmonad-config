@@ -2,11 +2,18 @@
 
 set -euf
 
-user_session_lib_dir="$HOME/.Xsession.d"
+user_session_dir="$HOME/.Xsession.d"
 
-. "$user_session_lib_dir/xkb_ctrl_esc_to_super.sh"
+session_files=$(run-parts --list $user_session_dir)
+if [ -n "$session_files" ]; then
+  for f in $session_files; do
+    . $f
+  done
+fi
 
-xkb_ctrl_esc_to_super
+if [ "${include_xkb_ctrl_esc_to_super:-}" = "1" ]; then
+    xkb_ctrl_esc_to_super
+fi
 
 # Haskell's `arch` from System.Info defines 32-bit architecture as i386, so
 # should i.
