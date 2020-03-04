@@ -8,26 +8,25 @@ user-message: ! 'Warning: Specified resolver could not satisfy all dependencies.
 '
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-12.20
+resolver: lts-13.17
 
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
-- location:
-    git: https://github.com/jaor/xmobar.git
-    commit: fcade764395401097b8907d230bc85c2437b65b5
-  extra-dep: false
+- extra-pkgs/xmobar
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - xmonad-entryhelper-0.1.0.0
 - git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-  commit: b8f2f9194d98b110bd16765e5e822899cd5943be
+  commit: 2ccf1b0ba6c36e1555f33da8dc34e2553d8fd2ab
 - git: https://github.com/sgf-dma/sgf-haskell-common.git
-  commit: d8e65231a4337e8385f9d94b5b68ccff012f46c7
+  commit: bc81a61f469604f23325323040dc27c0d6590107
 - git: https://github.com/sgf-dma/xmonad-contrib.git
   commit: 0c084d3d22929d598917442466f2db6e621e1c57
 - xmonad-0.15
+- iwlib-0.1.0
+- parsec-numbers-0.1.0
 
 # Override default flag values for local packages and extra-deps
 flags:
