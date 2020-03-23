@@ -118,7 +118,7 @@ firefoxEsr :: Program [String]
 firefoxEsr          = setA progStartup False
                         . setA progBin "gtk-launch"
                         . setA progWorkspace "1"
-                        . setA progLaunchKey ((0, xK_e) : sessionKeys)
+                        . setA progLaunchKey [(0, xK_e)]
                         . setA progArgs ["firefox-52.9.0esr"]
                         $ defaultProgram
 
