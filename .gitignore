@@ -7,7 +7,6 @@ t.*
 dist/
 build/
 .stack-work/
-sgf-xmonad.cabal
 stack.yaml.lock
 
 # Vim
