@@ -23,7 +23,7 @@ extra-deps:
 - git: https://github.com/sgf-dma/xmonad-contrib.git
   commit: fa13138f324dac6612d40fa28cd2174251f32621
 - git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-  commit: 84ede7496f04943f5c9396562f29eb79a914cf82
+  commit: 9995ed6e9a1987f07358a87417d1d552b8e3e41f
 - xmonad-0.15
 - iwlib-0.1.0
 - parsec-numbers-0.1.0
