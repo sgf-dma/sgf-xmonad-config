@@ -2,23 +2,18 @@
 
 set -euf
 
-user_session_lib_dir="$HOME/.Xsession.d"
+user_session_dir="$HOME/.Xsession.d"
 
-. "$user_session_lib_dir/xkb_ctrl_esc_to_super.sh"
-. "$user_session_lib_dir/run_cmd.sh"
-
-# Commands to run in X session. To add new command define variable here, and
-# pass variable name to run_cmd() function below. Command will be run through
-# `eval`.
-wpa_gui='/usr/sbin/wpa_gui'
-trayer='/usr/bin/trayer --edge top --align right --SetDockType true --SetPartialStrut true --expand true --width 10 --transparent true --tint 0x191970 --height 12'
-if [ -r ~/.fehbg ]; then
-    feh="$(cat ~/.fehbg)"
-else
-    feh='xsetroot -grey'
+session_files=$(run-parts --list $user_session_dir)
+if [ -n "$session_files" ]; then
+  for f in $session_files; do
+    . $f
+  done
 fi
 
-xkb_ctrl_esc_to_super
+if [ "${include_xkb_ctrl_esc_to_super:-}" = "1" ]; then
+    xkb_ctrl_esc_to_super
+fi
 
 # Haskell's `arch` from System.Info defines 32-bit architecture as i386, so
 # should i.
@@ -26,7 +21,7 @@ uname_M="$(uname -m | sed -e 's/i686/i386/')"
 # `tr` does not work for non-ascii chars, though is more compatible, than
 # version with GNU sed's '\L' flag in s/// command (which works with unicode),
 uname_S="$(uname -s | tr '[[:upper:]]' '[[:lower:]]')"
-user_xmonad="~/.xmonad/xmonad-$uname_M-$uname_S"
+user_xmonad="$HOME/.xmonad/xmonad-$uname_M-$uname_S"
 echo "Starting xmonad.."
 exec $user_xmonad
 

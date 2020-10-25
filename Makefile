@@ -20,12 +20,13 @@ uname_S 	:= $(call lc,$(shell uname -s))
 .SUFFIXES:
 
 src_dir		:= src
+xsession_src_dir := $(src_dir)/Xsession.d
 build_dir	:= build
 
 xsession_dir		:= $(HOME)/.Xsession.d
 xsession		:= Xsession
 xsession_scripts	:= run_cmd.sh xkb_ctrl_esc_to_super.sh
-installed_xsession	:= $(HOME)/.Xsession $(addprefix $(xsession_dir)/, $(xsession_scripts))
+installed_xsession	:= $(HOME)/.Xsession $(addprefix $(xsession_dir)/, $(basename $(xsession_scripts)))
 
 bin_path		:= $(HOME)/bin
 home_local_path		:= $(HOME)/.local
@@ -89,7 +90,7 @@ $(xsession_dir) :
 # For making this behavior consistent and matching the idea, that installed
 # files must not be edited in-place, i reinstall all xsession files every time
 # (actual copy may not happen, if files have not changed).
-$(xsession_dir)/%.sh : $(build_dir)/%.sh $(xsession_dir) FORCE
+$(xsession_dir)/% : $(xsession_src_dir)/%.sh $(xsession_dir) FORCE
 	$(call install_file)
 # See above note about intermediate files.
 .INTERMEDIATE: $(build_dir)/$(xsession)

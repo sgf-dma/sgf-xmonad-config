@@ -14,7 +14,6 @@ resolver: lts-15.3
 packages:
 - '.'
 - extra-pkgs/xmobar
-  extra-dep: false
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
@@ -23,6 +22,8 @@ extra-deps:
 - extra-deps/sgf-haskell-common
 - extra-deps/xmonad-contrib
 - xmonad-0.15
+- iwlib-0.1.0
+- parsec-numbers-0.1.0
 
 # Override default flag values for local packages and extra-deps
 flags:
