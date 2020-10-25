@@ -1,0 +1,65 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 22610e789d80e63a9c514fdb5e9995786ec64a662f4322df827456cde7b3bf6f
+
+name:           sgf-xmonad
+version:        1.5.0
+synopsis:       sgf's xmonad config
+category:       Graphics
+homepage:       https://github.com/sgf-dma/sgf-xmonad-config#readme
+bug-reports:    https://github.com/sgf-dma/sgf-xmonad-config/issues
+author:         sgf
+maintainer:     sgf.dma@gmail.com
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/sgf-dma/sgf-xmonad-config
+
+executable default-xmonad
+  main-is: default-xmonad.hs
+  other-modules:
+      Paths_sgf_xmonad
+  hs-source-dirs:
+      src
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
+  build-depends:
+      X11
+    , base
+    , directory
+    , filepath
+    , process
+    , sgf-haskell-common
+    , sgf-xmonad-modules
+    , tagged
+    , xmonad
+    , xmonad-contrib
+    , xmonad-entryhelper
+  default-language: Haskell2010
+
+executable xmonad
+  main-is: xmonad.hs
+  other-modules:
+      Paths_sgf_xmonad
+  hs-source-dirs:
+      src
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
+  build-depends:
+      X11
+    , base
+    , directory
+    , filepath
+    , process
+    , sgf-haskell-common
+    , sgf-xmonad-modules
+    , tagged
+    , xmonad
+    , xmonad-contrib
+    , xmonad-entryhelper
+  default-language: Haskell2010
