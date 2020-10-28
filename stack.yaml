@@ -21,9 +21,9 @@ extra-deps:
 - git: https://github.com/sgf-dma/sgf-haskell-common.git
   commit: ad5d973ed928fc0cc3d9e0460389c2f0b5e48e56
 - git: https://github.com/sgf-dma/xmonad-contrib.git
-  commit: fa13138f324dac6612d40fa28cd2174251f32621
+  commit: 81a7c6d20c6934e65f565fd3bf29ff592c1c2e9f
 - git: https://github.com/sgf-dma/sgf-xmonad-modules.git
-  commit: 9995ed6e9a1987f07358a87417d1d552b8e3e41f
+  commit: 5d5faf0fc6584b00bd744bada83c533c13687bca
 - xmonad-0.15
 - iwlib-0.1.0
 - parsec-numbers-0.1.0
